@@ -81,11 +81,11 @@ static enum hrtimer_restart digital_timer_callback(struct hrtimer *timer)
 		our_timer.nsec_current_ktime=ktime_get_real_ns();
 				}
 	
-    	st7735fb_timer_display(); 
 		
 	if (my_button.mode==TIMER)
 
 	{
+		st7735fb_timer_display(); 
     		hrtimer_forward_now(timer,ms_to_ktime(SMART_CLOCK_TIMER_CALLBACK_NS));
     		return HRTIMER_RESTART;
 	} else {
