@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * to be filled
+ * .
  *
  * Dmytro Volkov <splissken2014@gmail.com>
  *
@@ -13,71 +13,28 @@
 #include <linux/gpio.h>     //GPIO
 #include <linux/export.h>  //export project class name
 #include <linux/types.h>
-#include <linux/timer.h>  //timer
-#include <linux/interrupt.h> //irq trigger
-#include <linux/device.h>
 #include "project1.h"
 
 #define MODULE_NAME module_name(THIS_MODULE)
-#define DEVICE_NAME "gpio_button"
+
+#define DEVICE_NAME "smart_clock"
 #define CLASS_NAME  "project1"
-#define TRIGGER_IRQ "button trigger irq"
-#define DEBOUNCE_INTERVAL 200
-#define LONGPRESS_INTERVAL 2000
 
 static dev_t dev;
 static int is_open;
 
-static struct cdev gpio_button_cdev;
+static struct cdev smart_clock_cdev;
 static struct class *dev_class;
-static uint8_t led_num, button_irq;
-static struct timer_list bDebounce_timer, bLongpress_timer;
+
+
 unsigned char fs_buffer[BUFFER_MAX_SIZE] = {0};
 size_t fs_buffer_size;
-static unsigned long flags = 0, counter=0, longpress_counter=0;
-static uint8_t is_debounce_timer, is_longpress;
+
 
 
 /* exporting device class for use with another project modules */
 EXPORT_SYMBOL_GPL(dev_class);
 
-static void button_longpress_timer(struct timer_list *t)
-{
-	if ((!is_debounce_timer) && (longpress_counter==counter) && gpio_get_value(button_gpios[0].gpio)) {
-	printk("button_isr long press!!!! %d\n", counter); 
-	is_longpress=1; 
-	}
-
-          
-}
-
-static void button_debounce_timer (struct timer_list *t)
-{
-	is_debounce_timer=0;
-	if (!gpio_get_value(button_gpios[0].gpio)) printk("button_isr !!!! %d\n", counter);  
-
-          
-}
-
-static irqreturn_t button_press(int irq, void *data)
-{
-	local_irq_save(flags);
-        
-	
-
-	if (!is_debounce_timer)  {
-		counter ++;
-		mod_timer(&bDebounce_timer,
-			jiffies + msecs_to_jiffies(DEBOUNCE_INTERVAL));
-		mod_timer(&bLongpress_timer,
-			jiffies + msecs_to_jiffies(LONGPRESS_INTERVAL));
-		is_debounce_timer=1;
-		is_longpress=0;
-		longpress_counter=counter;		
-		}
-	local_irq_restore(flags);
-	return IRQ_HANDLED;
-}
 
 static int my_dev_event(struct device *dev, struct kobj_uevent_env *env)
 {
@@ -85,12 +42,11 @@ static int my_dev_event(struct device *dev, struct kobj_uevent_env *env)
 	return 0;
 }
 
-
-static struct file_operations gpio_button_fops;
+static struct file_operations smart_clock_fops;
 
  /* Driver init */
 
-static int  __init gpio_button_driver_main(void)
+static int  __init smart_clock_main(void)
 {
 
 	  /* Allocating chardev */
@@ -102,11 +58,11 @@ static int  __init gpio_button_driver_main(void)
 	pr_err("%s: Major = %d Minor = %d\n", DEVICE_NAME, MAJOR(dev), MINOR(dev));
 
 	/*Creating cdev structure*/
-	cdev_init(&gpio_button_cdev, &gpio_button_fops);
+	cdev_init(&smart_clock_cdev, &smart_clock_fops);
 
 	/*Adding chardev to the system*/
 
-	if ((cdev_add(&gpio_button_cdev, dev, 1)) < 0) {
+	if ((cdev_add(&smart_clock_cdev, dev, 1)) < 0) {
 		pr_err("%s: Cannot add the device to the system\n", DEVICE_NAME);
 	goto dev_del;
 	}
@@ -127,59 +83,30 @@ static int  __init gpio_button_driver_main(void)
 		goto dev_remove;
 	}
 
-	/* Getting data from dt and register GPIO */
-
-
-*/
-	if (!gpio_is_valid(button_gpios[0].gpio)) {
-			pr_err("%s: Gpio %i is not valid", DEVICE_NAME, button_gpios[0].gpio);
-			goto dev_remove;
-		}
-	/* Multiple GPIO's request*/
-	if (gpio_request_array(button_gpios, 1)) {
-		pr_err("%s: Cannot request GPIOs\n", DEVICE_NAME);
-		goto remove_gpio;
-	}
-
-	/* UnHiding GPIO's controls from gpio sysfs */
-	//for (gpio_num = 0; led_num < 1 ; gpio_num++)
-		gpio_export(button_gpios[0].gpio, true);
-		button_irq = gpio_to_irq(button_gpios[0].gpio);
-			if (button_irq < 0) {
-				pr_err("Unable to get irq number for GPIO %d, error %d\n",
-					button_gpios[0].gpio, button_irq);
-				goto remove_gpio;
-			}
-			
-		
-		if( request_irq( button_irq, button_press ,IRQF_TRIGGER_RISING, TRIGGER_IRQ, DEVICE_NAME)) {
-			pr_err("Register IRQ %d, error\n",
-					button_gpios[0].gpio);
-				goto free_irq;
+	if (gpio_button_init()) {
+		pr_err("%s: GPIO button init fail\n", DEVICE_NAME);
+		goto dev_remove;
 		}
 
-		timer_setup(&bDebounce_timer, button_debounce_timer, 0);
-		timer_setup(&bLongpress_timer, button_longpress_timer, 0);
-		is_debounce_timer=0;
-		is_longpress=0;
-
-
-				
-				
+	st7735fb_init();
+	bmp280_init();
+	ds3231_init();
+	init_controls();
 	
 
 return 0;
 
-free_irq:
-	free_irq(button_irq, DEVICE_NAME);
-remove_gpio:
-	gpio_free_array(button_gpios, 1);
+//procfs_fail:
+//	leds_control_stop();
+//	leds_rgb_exit_procfs();
+//remove_gpio:
+//	gpio_free_array(leds_gpios, ARRAY_SIZE(leds_gpios));
 dev_remove:
 	device_destroy(dev_class, dev);
 class_del:
 	class_destroy(dev_class);
 dev_del:
-	cdev_del(&gpio_button_cdev);
+	cdev_del(&smart_clock_cdev);
 dev_unreg:
 	unregister_chrdev_region(dev, 1);
 
@@ -189,16 +116,21 @@ return -1;
 
 /* Driver exit */
 
-static void  __exit gpio_button_driver_exit(void)
+static void  __exit smart_clock_exit(void)
 {
-	free_irq(button_irq, DEVICE_NAME);
-	gpio_free_array(button_gpios,1 );
+	pr_err("%s: Quitting driver OK", DEVICE_NAME);
+	//leds_control_stop();
+	//leds_rgb_exit_procfs();
+	//gpio_free_array(leds_gpios, ARRAY_SIZE(leds_gpios));
+	deinit_controls();
+	bmp280_deinit();
+	ds3231_deinit();
+	gpio_button_deinit();	
+	st7735fb_exit();
 	device_destroy(dev_class, dev);
 	class_destroy(dev_class);
-	cdev_del(&gpio_button_cdev);
+	cdev_del(&smart_clock_cdev);
 	unregister_chrdev_region(dev, 1);
-	pr_err("%s: Quitting driver OK", DEVICE_NAME);
-
 }
 
 
@@ -251,12 +183,18 @@ static ssize_t device_file_write(struct file *filp, const char __user *buffer, s
 		return -EFAULT;
 	}
 	pr_err("%s: Driver write = %s\n", MODULE_NAME, fs_buffer);
+	char *word="Time is:";
+	if (!memcmp(fs_buffer, "clean", strlen("clean"))) st7735fb_blank_display();
+	//if (!memcmp(fs_buffer, "word", strlen("word"))) st7735fb_draw_string(word);
+	//if (!memcmp(fs_buffer, "rotate", strlen("rotate"))) st7735fb_rotate_display();
+	//if (leds_control(fs_buffer))
+	//	pr_err("%s: write blink delay failed\n", MODULE_NAME);
 
 	return count;
 }
 
 
-static struct file_operations gpio_button_fops = {
+static struct file_operations smart_clock_fops = {
 	.owner  = THIS_MODULE,
 	.read	= device_file_read,
 	.write  = device_file_write,
@@ -265,10 +203,11 @@ static struct file_operations gpio_button_fops = {
 };
 
 
-module_init(gpio_button_driver_main);
-module_exit(gpio_button_driver_exit);
+module_init(smart_clock_main);
+module_exit(smart_clock_exit);
+
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("Eddie07 <splissken2014@gmail.com>");
-MODULE_DESCRIPTION("GPIO button driver");
+MODULE_DESCRIPTION("Custom GPIO's driver for RGB leds");
 MODULE_VERSION("0.1");
