@@ -59,11 +59,11 @@ struct st7735fb_par {
 
 
 /* colors */
-const uint32_t WHITE_COLOR=0xffffffu;//white
-const uint32_t RED_COLOR=0xff0000u;//red
-const uint32_t GREEN_COLOR=0x008000u;//green
-const uint32_t BLUE_COLOR=0x0000ffu;//blue
-const uint32_t YELLOW_COLOR=0xffff00u;//yellow 
+const uint16_t WHITE_COLOR=0xffff;//white
+const uint16_t RED_COLOR=0xf800;//red
+const uint16_t GREEN_COLOR=0x07e0;//green
+const uint16_t BLUE_COLOR=0x001f;//blue
+const uint16_t YELLOW_COLOR=0xffe0;//yellow 
 
 
 /* ST7735 Commands */

@@ -22,7 +22,7 @@
 const char* days[] = {"Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"};
 
 
-static void st7735fb_draw_string(char *, uint16_t, uint16_t, const struct BitmapFont *, uint8_t , const uint32_t color ); 
+static void st7735fb_draw_string(char *, uint16_t, uint16_t, const struct BitmapFont *, uint8_t , const uint16_t color ); 
 
  
 
@@ -178,7 +178,7 @@ void st7735fb_clock_display(void)
 	struct tm tm_now;
         char time[20];
 	int i,x,y,step;
-	uint32_t color=YELLOW_COLOR;
+
 	
 
 	//ktime_get_ts64(&curr_tm);
@@ -224,7 +224,7 @@ void st7735fb_timer_display(void)
         char timer[20]={0};
 
 	int i=0,x=0,y=20,step=0;
-	uint32_t color=YELLOW_COLOR;
+
 
 	sprintf (timer, "%lld", NS_TO_MSEC(our_timer.nsec));
 
@@ -243,7 +243,7 @@ void st7735fb_temperature_display(void)
 {
 	
 
-	uint32_t color=YELLOW_COLOR;
+
 
 	
         char temperature[20]={0};
@@ -263,7 +263,7 @@ void st7735fb_temperature_display(void)
 
 
 
-static void draw_char(char letter, uint16_t x, uint16_t y, const struct BitmapFont *font,const uint32_t color )
+static void draw_char(char letter, uint16_t x, uint16_t y, const struct BitmapFont *font, uint16_t color )
 {
 	uint16_t *vmem16 = (uint16_t *)par.screen_base;
 	uint8_t xc,yc;	
@@ -286,7 +286,7 @@ static void draw_char(char letter, uint16_t x, uint16_t y, const struct BitmapFo
 
 }
 
-static void st7735fb_draw_string(char *word, uint16_t x, uint16_t y, const struct BitmapFont *font, uint8_t x_offset, const uint32_t color ) 
+static void st7735fb_draw_string(char *word, uint16_t x, uint16_t y, const struct BitmapFont *font, uint8_t x_offset, uint16_t color ) 
 
 {
 	uint8_t i=0;
