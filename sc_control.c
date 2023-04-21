@@ -96,7 +96,7 @@ static enum hrtimer_restart digital_timer_callback(struct hrtimer *timer)
 
 static void digital_clock_callback (struct timer_list *t) {
     	st7735fb_clock_display(); 
-	if (my_button.mode==CLOCK) 
+	if (my_button.mode==CLOCK || my_button.clock_set) 
         mod_timer(&digital_clock,
 			jiffies + msecs_to_jiffies(SMART_CLOCK_TIME_CALLBACK));
 	

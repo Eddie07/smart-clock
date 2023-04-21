@@ -27,7 +27,7 @@ static uint8_t button_irq;
 static struct timer_list bDebounce_timer, bLongpress_timer;
 
 static unsigned long flags = 0, counter=0, longpress_counter=0;
-static uint8_t is_debounce_timer, is_longpress;
+static uint8_t is_debounce_timer;
 struct button my_button;
 
 
@@ -55,7 +55,7 @@ static void switch_view(void ) {
 
 void button_workqueue_fn(struct work_struct *work)
 {              
-	if (!is_longpress) mod_timer(&bDebounce_timer,
+	if (!my_button.is_longpress) mod_timer(&bDebounce_timer,
 			jiffies + msecs_to_jiffies(BUTTON_DEBOUNCE_INTERVAL));
 	mod_timer(&bLongpress_timer,
 			jiffies + msecs_to_jiffies(BUTTON_LONGPRESS_INTERVAL));
@@ -72,16 +72,16 @@ static void button_longpress_timer(struct timer_list *t)
 {
 	if  ((longpress_counter==counter) && gpio_get_value(button_gpio.gpio)) {
 	printk("button_isr long press!!!! %lu\n", counter);
-	if (is_longpress) {
+	if (my_button.is_longpress) {
 		my_button.state=3;
-		switch_view();
+		if (!my_button.clock_set) switch_view();
 		}
 		else my_button.state=2;
        
- 	is_longpress++;
+ 	my_button.is_longpress++;
 	mod_timer(&bLongpress_timer,
 			jiffies + msecs_to_jiffies(BUTTON_2ND_LONGPRESS_INTERVAL));
-		} else  is_longpress=0;
+		} else  my_button.is_longpress=0;
 
           
 }
@@ -90,7 +90,7 @@ static void button_debounce_timer (struct timer_list *t)
 {
 	
 	is_debounce_timer=0;
-		if (!gpio_get_value(button_gpio.gpio)&& (!is_longpress)) 
+		if (!gpio_get_value(button_gpio.gpio)&& (!my_button.is_longpress)) 
 			{ my_button.state=1;
 			printk("button_isr short press!!!! %lu\n", counter);
 			} else my_button.state=0;
@@ -102,7 +102,7 @@ static irqreturn_t button_press(int irq, void *data)
 	local_irq_save(flags);
 	
 	counter ++;
-	if (!is_debounce_timer && !is_longpress)  {
+	if (!is_debounce_timer && !my_button.is_longpress)  {
 		schedule_work(&button_workqueue);
 		is_debounce_timer=1;
 				} 
@@ -155,8 +155,9 @@ int  gpio_button_init(void)
 		timer_setup(&bDebounce_timer, button_debounce_timer, 0);
 		timer_setup(&bLongpress_timer, button_longpress_timer, 0);
 		is_debounce_timer=0;
-		is_longpress=0;
+		my_button.is_longpress=0;
 		my_button.state=0;
+		my_button.clock_set=0;
 		//our_timer.reset=1;
 		
 return 0;

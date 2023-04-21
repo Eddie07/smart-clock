@@ -47,6 +47,8 @@ NO_DEV,
 struct button {
 	uint8_t mode;
 	uint8_t state;
+	uint8_t clock_set;
+	uint8_t is_longpress;
 };
 
 struct clock_timer {
