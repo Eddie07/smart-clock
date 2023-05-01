@@ -66,6 +66,8 @@ struct BMP280CalibrationData {
   int16_t P9;
 } calib_data;
 
-
-
+//struct bmp280 {
+//	struct	 i2c_client *client;
+//} bmp280;
+struct	i2c_client *bmp280_i2c;
 #endif

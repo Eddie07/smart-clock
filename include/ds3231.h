@@ -11,13 +11,14 @@
 #define DS3231_REG_SEC    		0x00
 #define DS3231_REG_MIN    		0x01
 #define DS3231_REG_HOUR    		0x02
-#define DS3231_REG_DOW    		0x03
+#define DS3231_REG_WDAY    		0x03
 #define DS3231_REG_DAY    		0x04
-#define DS3231_REG_MONTH    		0x05
+#define DS3231_REG_MON   		0x05
 #define DS3231_REG_YEAR    		0x06
 
 /* Alarm registers */
 
+#define DS3231_REG_ALARM_SEC    	0x07
 #define DS3231_REG_ALARM_MIN    	0x08
 #define DS3231_REG_ALARM_HOUR   	0x09
 
@@ -26,5 +27,19 @@
   
 #define DS3231_REG_OPTIONS  		0x0b
 #define DS3231_REG_OPTION_UTC_ZONE   	0x0c
+
+struct ds3231 {
+	struct i2c_client *client;
+	uint8_t sec;
+	uint8_t min;
+	uint8_t hour;
+	uint8_t wday;
+	uint8_t mday;
+	uint8_t mon;
+	uint8_t year;
+	uint8_t alarm_sec;
+	uint8_t alarm_min;
+	uint8_t alarm_hour;
+} ds3231;
 
 #endif

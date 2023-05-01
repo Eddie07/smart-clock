@@ -13,7 +13,7 @@
 #include <linux/export.h>  //export project class name
 #include "include/project1.h"
 
-#define MODULE_NAME module_name(THIS_MODULE)
+
 
 #define DEVICE_NAME "smart_clock"
 #define CLASS_NAME  "project1"
@@ -23,7 +23,7 @@ static int is_open;
 
 static struct cdev smart_clock_cdev;
 static struct class *dev_class;
-
+struct init_hw  init_hw;
 
 //unsigned char fs_buffer[BUFFER_MAX_SIZE] = {0};
 char *fs_buffer;
@@ -83,19 +83,40 @@ static int  __init smart_clock_main(void)
 	}
 
 	if (gpio_button_init()) {
-		pr_err("%s: GPIO button init fail\n", DEVICE_NAME);
+		pr_err("GPIO button init fail\n");
 		goto dev_remove;
 		}
 
 	st7735fb_init();
-	bmp280_init();
-	ds3231_init();
+	if (!init_hw.st7735_spi_probed) { 
+		pr_err("st7735 spi panel init fail\n");
+		goto hw_panel_fail;
+		}
+	sensors_init();
+	if (!init_hw.bmp280_i2c_probed) { 
+		pr_err("bmp280 i2c sensor init fail\n");
+		goto hw_sensors_fail;
+		}
+	if (!init_hw.ds3231_i2c_probed) {
+		pr_err("ds3231 i2c sensor init fail\n");
+		goto hw_sensors_fail;
+		}
+	if (!init_hw.mpu6050_i2c_probed) {
+		pr_err("mpu6050 i2c sensor init fail\n");
+		goto hw_sensors_fail;
+		}
+	
 	init_controls();
 
 
 return 0;
 
 
+hw_sensors_fail:	
+	sensors_deinit();
+hw_panel_fail:
+	st7735fb_exit();
+	gpio_button_deinit();
 dev_remove:
 	device_destroy(dev_class, dev);
 class_del:
@@ -113,20 +134,16 @@ return -1;
 
 static void  __exit smart_clock_exit(void)
 {
-	//leds_control_stop();
-	//leds_rgb_exit_procfs();
-	//gpio_free_array(leds_gpios, ARRAY_SIZE(leds_gpios));
 	kfree(fs_buffer);
 	deinit_controls();
-	bmp280_deinit();
-	ds3231_deinit();
+	sensors_deinit();
 	gpio_button_deinit();
 	st7735fb_exit();
 	device_destroy(dev_class, dev);
 	class_destroy(dev_class);
 	cdev_del(&smart_clock_cdev);
 	unregister_chrdev_region(dev, 1);
-	pr_err("%s: module unloaded", MODULE_NAME);
+	pr_err("module unloaded \n");
 }
 
 
@@ -134,7 +151,7 @@ static void  __exit smart_clock_exit(void)
 static int device_file_open(struct inode *inode, struct file *file)
 {
 	if (is_open) {
-		pr_err("%s: Can't open. devsysfs is busy", MODULE_NAME);
+		pr_err("Can't open. devsysfs is busy");
 		return -EBUSY;
 	}
 	is_open = 1;
@@ -179,16 +196,16 @@ static ssize_t device_file_write(struct file *filp, const char __user *buffer, s
 
 	fs_buffer = kzalloc(count + 1, GFP_ATOMIC);
 	if (!fs_buffer) {
-		pr_err("%s: malloc failed", MODULE_NAME);
+		pr_err("malloc failed");
 		return -EINVAL;
 	}
 	if (copy_from_user(fs_buffer, buffer, fs_buffer_size)) {
-		pr_err("%s: sysfs write failed\n", MODULE_NAME);
+		pr_err("sysfs write failed\n");
 		return -EFAULT;
 	}
 
 
-	pr_err("%s: Driver write bytes %lld\n", MODULE_NAME, fs_buffer_size);
+	pr_err(" Driver write bytes %lld\n", fs_buffer_size);
 	st7735fb_draw_buff_display();
 	//if (!memcmp(fs_buffer, "clean", strlen("clean"))) st7735fb_blank_display();
 	//if (!memcmp(fs_buffer, "word", strlen("word"))) st7735fb_draw_string(word);

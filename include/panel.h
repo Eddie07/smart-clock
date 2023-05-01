@@ -1,10 +1,11 @@
 #ifndef __PANEL_H_INCLUDED
 #define __PANEL_H_INCLUDED
 
-#define DRVNAME		"st7735fb"
+
 #define WIDTH		160
 #define HEIGHT		128
 #define BPP		16
+#define MEM_SIZE        WIDTH*HEIGHT*BPP/8;
 
 
 
@@ -71,6 +72,13 @@ struct Bitmap font[] = {
 				{ font48_table, 24, 48 },
 };
 
+enum fonts {
+FONT16 = 0,
+FONT24,
+FONT32,
+FONT48,
+};
+
 const struct Bitmap icons = { icons_table, 16, 16 };
 
 
@@ -91,14 +99,14 @@ enum st7735_cmd {
 };
 
 
-struct st7735fb_par {
+struct st7735fb {
 	struct spi_device *spi;
 	uint8_t *spi_writebuf;
 	size_t vmem_size;
 	char __iomem *screen_base;	/* Virtual address */
 	uint8_t rst;
 	uint8_t dc;
-} par;
+} st7735fb;
 
 
 static struct st7735_function st7735_cfg[] = {

@@ -6,7 +6,6 @@
  *
  */
 
-#include <linux/module.h>
 #include <linux/gpio.h>     //GPIO
 #include <linux/export.h>  //export project class name
 #include <linux/types.h>
@@ -14,13 +13,13 @@
 #include <linux/interrupt.h> //irq trigger
 #include "include/project1.h"
 
-#define MODULE_NAME module_name(THIS_MODULE)
+
 #define TRIGGER_IRQ "button_trigger"
 #define DEVICE_NAME "gpio_button"
 
 #define BUTTON_DEBOUNCE_INTERVAL 150
 #define BUTTON_LONGPRESS_INTERVAL 500
-#define BUTTON_2ND_LONGPRESS_INTERVAL 500
+#define BUTTON_2ND_LONGPRESS_INTERVAL 800
 
 
 static uint8_t button_irq;
@@ -34,23 +33,27 @@ struct button my_button;
 
 static void switch_view(void ) 
 {
-		//while
 	my_button.mode++;
 	my_button.state = 0;
+	st7735fb_blank_display();
 	switch (my_button.mode) {
-		case CLOCK:		show_clock();
+		case CLOCK:		show_clock_view();
 					break;
-		case TIMER:
-					show_timer();
+		case TIMER:		show_timer_view();
 					break;
-		case TEMPERATURE:	show_temperature();
+		case ALARM:		show_alarm_view();
 					break;
-		case OPTIONS:		show_options();
+		case TEMP_AND_PRESS:	show_temp_and_press_view();
 					break;
-		case NO_DEV:		my_button.mode = 0;
+		case PEDOMETER:		show_pedometer_view();
+					break;
+		case GAME:		show_game_view();
+					break;
+		case OPTIONS:		show_options_view();
+					break;
+		case END:		my_button.mode = 0;
 					switch_view();
 					break;
-
 	}
 
 
@@ -74,16 +77,16 @@ DECLARE_WORK(button_workqueue, button_workqueue_fn);
 
 static void button_longpress_timer(struct timer_list *t)
 {
-	if  ((longpress_counter == counter) && gpio_get_value(button_gpio.gpio)) {
-	printk("button_isr long press!!!! %lu\n", counter);
-	if (my_button.is_longpress) {
-		my_button.state = 3;
-		if (!my_button.set_mode)
-			switch_view();
-		} else my_button.state=2;
-
- 	my_button.is_longpress = 1;
-	mod_timer(&bLongpress_timer,
+	if ((longpress_counter == counter) && gpio_get_value(button_gpio.gpio)) {
+		printk("button long press!!!! %lu\n", counter);
+		if (my_button.is_longpress) {
+			my_button.state = 3;
+			if (!my_button.set_mode)
+				switch_view();
+		} else 
+		my_button.state=2;
+ 		my_button.is_longpress = 1;
+		mod_timer(&bLongpress_timer,
 			jiffies + msecs_to_jiffies(BUTTON_2ND_LONGPRESS_INTERVAL));
 	} else  my_button.is_longpress = 0;
 
@@ -92,12 +95,12 @@ static void button_longpress_timer(struct timer_list *t)
 static void button_debounce_timer(struct timer_list *t)
 {
 
+	
+	if (!gpio_get_value(button_gpio.gpio) && (!my_button.is_longpress)) { 
+	        my_button.state = 1;
+		printk("button short press!!!! %lu\n", counter);
+	} else my_button.state = 0;
 	is_debounce_timer = 0;
-		if (!gpio_get_value(button_gpio.gpio) && (!my_button.is_longpress)) 
-			{ my_button.state = 1;
-			printk("button_isr short press!!!! %lu\n", counter);
-			} else my_button.state = 0;
-
 }
 
 static irqreturn_t button_press(int irq, void *data)
@@ -108,7 +111,6 @@ static irqreturn_t button_press(int irq, void *data)
 	if (!is_debounce_timer && !my_button.is_longpress)  {
 		schedule_work(&button_workqueue);
 		is_debounce_timer = 1;
-		my_button.is_longpress = 0;
 				}
 	local_irq_restore(flags);
 
@@ -124,11 +126,11 @@ int  gpio_button_init(void)
 	np = of_find_compatible_node(NULL, NULL, "smart-clock,button");
 	if (np) {
 		if (!of_property_read_u32(np, "button_gpio", &button_gpio.gpio))
-			pr_err("%s: Found Gpio %i value in DT", DEVICE_NAME, button_gpio.gpio);
+			pr_err("%s: found gpio #%i value in DT\n", DEVICE_NAME, button_gpio.gpio);
 		}
 
 	if (!gpio_is_valid(button_gpio.gpio)) {
-			pr_err("%s: Gpio %d is not valid", DEVICE_NAME, button_gpio.gpio);
+			pr_err("%s: gpio %d is not valid\n", DEVICE_NAME, button_gpio.gpio);
 			return -1;
 		}
 	/* GPIO's request*/
@@ -137,10 +139,13 @@ int  gpio_button_init(void)
 		return -1;
 	}
 
-		gpio_export(button_gpio.gpio, true);
+		/* hiding gpio from sysfs */
+		gpio_export(button_gpio.gpio, false);
+
+		/* requesting IRQ for gpio handler */
 		button_irq = gpio_to_irq(button_gpio.gpio);
 			if (button_irq < 0) {
-				pr_err("Unable to get irq number for GPIO %d, error %d\n",
+				pr_err("%s: unable to get irq number for GPIO %d, error %d\n", DEVICE_NAME,
 					button_gpio.gpio, button_irq);
 					gpio_free(button_gpio.gpio);
 					return -1;
@@ -148,20 +153,19 @@ int  gpio_button_init(void)
 
 
 		if (request_irq( button_irq, button_press, IRQF_TRIGGER_RISING, TRIGGER_IRQ, DEVICE_NAME)) {
-			pr_err("Register IRQ %d, error\n",
+			pr_err("%s: register IRQ %d, error\n", DEVICE_NAME,
 					button_gpio.gpio);
 					free_irq(button_irq, DEVICE_NAME);
 					gpio_free(button_gpio.gpio);
 					return -1;
 		}
 
-
+		/* setting up timers for debounce and long press #1 detection */
 		timer_setup(&bDebounce_timer, button_debounce_timer, 0);
 		timer_setup(&bLongpress_timer, button_longpress_timer, 0);
 		is_debounce_timer = 0;
 		my_button.state = 0;
 		my_button.set_mode = 0;
-		//our_timer.reset=1;
 
 return 0;
 
@@ -170,7 +174,7 @@ return 0;
 
 void  gpio_button_deinit(void)	
 {
-	printk("Gpio Button - device exit\n");
+	pr_err("%s: device exit\n", DEVICE_NAME);
 	del_timer_sync(&bDebounce_timer);
 	del_timer_sync(&bLongpress_timer);
 	free_irq(button_irq, DEVICE_NAME);
