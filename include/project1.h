@@ -32,6 +32,8 @@
 /// Convert nanoseconds
 #define NS_TO_MSEC(nsec) (div_s64(nsec, NS_PER_MSEC))
 
+#define WIDTH		160
+#define HEIGHT		128
 
 /*set default GPIO value to avoid troubles. But later replace from DT*/
 
@@ -47,13 +49,13 @@ static struct gpio button_gpio = { 17, GPIOF_DIR_IN,  "Switch button"};
 
 
 enum disp_modes {
-CLOCK = 1,
+CLOCK=1,
 TIMER,
 ALARM,
 TEMP_AND_PRESS,
 PEDOMETER,
-OPTIONS,
 GAME,
+OPTIONS,
 END,
 };
 
@@ -94,10 +96,18 @@ struct temp_and_press {
 };
 
 struct game {
-	uint16_t x;
-	uint16_t y;
-	int8_t accel_delta_x;
-	int8_t accel_delta_y;
+	int16_t x;
+	int16_t y;
+	uint16_t *tail_x;
+	uint16_t *tail_y;
+	size_t len;
+	uint16_t fruit_x;
+	uint16_t fruit_y;
+	uint16_t is_fruit;
+	int8_t dir_x;
+	int8_t dir_y;
+	uint8_t score;
+	uint8_t game_over;
 	uint32_t steps_count;
 };
 
@@ -107,16 +117,14 @@ struct options {
 	uint8_t is_temp_celsius:1;
 };
 
-
-//static void st7735fb_clock_display(void);
-//static void st7735fb_timer_display(void);
+struct fs_buffer {
+	char * buf;
+	size_t buf_len;
+};
 
 /*****************************************************************************
 * Global variable or extern global variabls/functions
 *****************************************************************************/
-extern char *fs_buffer;//[BUFFER_MAX_SIZE];
-extern size_t fs_buffer_size;
-
 extern int  st7735fb_init(void);
 extern void st7735fb_exit(void);
 extern int  gpio_button_init(void);
@@ -149,9 +157,7 @@ extern void show_pedometer_view(void);
 extern void show_game_view(void);
 extern void show_options_view(void);
 
-
-
-
+extern struct fs_buffer fs_buffer;
 extern struct button my_button;
 extern struct clock_timer our_timer;
 extern struct clock clock;
@@ -159,11 +165,7 @@ extern struct options options;
 extern struct temp_and_press temp_and_press; 
 extern struct init_hw init_hw;
 extern struct game game;
-
-
-
-
-
+extern struct big big;
 
 
 

@@ -29,7 +29,7 @@
 
 #define I2C_DATA_BUFFER_MAX	(10)
 
-#define ABS(x) (x < 0 ? -x : x )
+#define ABS(x) (x < 0 ? -x : x)
 
 
 struct temp_and_press temp_and_press;
@@ -40,22 +40,22 @@ static struct task_struct *bmp280_read_thread, *mpu6050_read_thread;
 
 
 
-static int i2c_write_data (struct i2c_client *client, uint8_t command, uint8_t *data, size_t size)
-{	
-	return i2c_smbus_write_i2c_block_data (client, command, size, data);
-}
-
-static int i2c_read_data (struct i2c_client *client, uint8_t command, uint8_t *data, size_t size)
+static int i2c_write_data(struct i2c_client *client, uint8_t command, uint8_t *data, size_t size)
 {
-	return i2c_smbus_read_i2c_block_data (client, command, size,data);
+	return i2c_smbus_write_i2c_block_data(client, command, size, data);
 }
 
-static int i2c_read_byte(struct i2c_client *client,uint8_t command) 
+static int i2c_read_data(struct i2c_client *client, uint8_t command, uint8_t *data, size_t size)
+{
+	return i2c_smbus_read_i2c_block_data (client, command, size, data);
+}
+
+static int i2c_read_byte(struct i2c_client *client, uint8_t command) 
 {
 	return i2c_smbus_read_byte_data(client, command);
 }
 
-static int i2c_write_byte(struct i2c_client *client,uint8_t command,uint8_t data) 
+static int i2c_write_byte(struct i2c_client *client, uint8_t command, uint8_t data) 
 {
 	return i2c_smbus_write_byte_data(client, command, data);
 }
@@ -69,39 +69,40 @@ static int i2c_write_byte(struct i2c_client *client,uint8_t command,uint8_t data
 int bmp280_read_temp_and_press(void *pv)
 {
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
-    	uint8_t pmsb, plsb, pxsb, tmsb, tlsb, txsb;
-	uint32_t  adc_t,adc_p, t_fine;
+	uint8_t pmsb, plsb, pxsb, tmsb, tlsb, txsb;
+	uint32_t  adc_t, adc_p, t_fine;
 	uint64_t var1, var2, p;
-    	
+
+
 	while (!kthread_should_stop()) {
 
 		mutex_lock(&i2c_read);
-    		/*  Read registers */
+		/*  Read registers */
 		i2c_read_data(bmp280_i2c, BMP280_REG_PRESSURE_MSB, data_buf, 6);
 		mutex_unlock(&i2c_read);
-		
+
 		pmsb = data_buf[0]; // BMP280_REG_PRESSURE_MSB
-     		plsb = data_buf[1]; // BMP280_REG_PRESSURE_LSB
-    		pxsb = data_buf[2]; // BMP280_REG_PRESSURE_XLSB
-        	tmsb = data_buf[3]; // BMP280_REG_TEMP_MSB
+		plsb = data_buf[1]; // BMP280_REG_PRESSURE_LSB
+		pxsb = data_buf[2]; // BMP280_REG_PRESSURE_XLSB
+		tmsb = data_buf[3]; // BMP280_REG_TEMP_MSB
 		tlsb = data_buf[4]; // BMP280_REG_TEMP_LSB
-    		txsb = data_buf[5]; // BMP280_REG_TEMP_XLSB
+		txsb = data_buf[5]; // BMP280_REG_TEMP_XLSB
 
 		/* Convert pressure and temperature data to 19-bits */
-   		adc_t = ((((tmsb << 8) | tlsb)<<8) | txsb )>>4;
-   		adc_p = ((((pmsb << 8) | plsb)<<8) | pxsb )>>4;
+		adc_t = ((((tmsb << 8) | tlsb)<<8) | txsb)>>4;
+		adc_p = ((((pmsb << 8) | plsb)<<8) | pxsb)>>4;
 
-		/* Calculate temperature */ 
+		/* Calculate temperature */
 		var1 = ((((adc_t >> 3) - ((int32_t)calib_data.T1 << 1))) *
 		((int32_t)calib_data.T2)) >> 11;
 		var2 = (((((adc_t >> 4) - ((int32_t)calib_data.T1)) *
 		  ((adc_t >> 4) - ((int32_t)calib_data.T1))) >> 12) *
 		((int32_t)calib_data.T3)) >> 14;
-		t_fine=(uint32_t)var1+(uint32_t)var2;
-	
-		temp_and_press.temp=((t_fine * 5 + 128) >> 8);
+		t_fine = (uint32_t)var1+(uint32_t)var2;
 
-		/* Calculate pressure */ 
+		temp_and_press.temp = ((t_fine * 5 + 128) >> 8);
+
+		/* Calculate pressure */
 		var1 = (int64_t)t_fine - 128000;
 		var2 = var1 * var1 * (int64_t)calib_data.P6;
 		var2 += (var1 * (int64_t)calib_data.P5) << 17;
@@ -114,7 +115,7 @@ int bmp280_read_temp_and_press(void *pv)
 		p = div64_s64(p, var1);
 		var1 = ((int64_t)calib_data.P9 * (p >> 13) * (p >> 13)) >> 25;
 		var2 = ((int64_t)calib_data.P8 * p) >> 19;
-		temp_and_press.press=(uint32_t)((p + var1 + var2) >> 8) + ((int64_t)calib_data.P7 << 4);
+		temp_and_press.press = (uint32_t)((p + var1 + var2) >> 8) + ((int64_t)calib_data.P7 << 4);
 
 		msleep(DC3231_THREAD_SLEEP);
 	}
@@ -135,8 +136,8 @@ static int bmp280_probe(struct i2c_client *client,
 			pr_err("%s: probe failed\n", BMP280_DEVICE_NAME);
 			return -ENODEV;
 			}
-	else 	{
-		init_hw.bmp280_i2c_probed=1;
+	else	{
+		init_hw.bmp280_i2c_probed = 1;
 		pr_err("%s: probed\n", BMP280_DEVICE_NAME);
 		}
 
@@ -156,16 +157,16 @@ static int bmp280_probe(struct i2c_client *client,
 	calib_data.P8 = (i2c_read_byte(bmp280_i2c, BMP280_REG_P8_LSB) | i2c_read_byte(bmp280_i2c, BMP280_REG_P8_MSB) << 8);
 	calib_data.P9 = (i2c_read_byte(bmp280_i2c, BMP280_REG_P9_LSB) | i2c_read_byte(bmp280_i2c, BMP280_REG_P9_MSB) << 8);
 
-    	i2c_write_byte(bmp280_i2c, BMP280_REG_CTRL_MEAS, 0x27);
+	i2c_write_byte(bmp280_i2c, BMP280_REG_CTRL_MEAS, 0x27);
 	udelay(100);
-	bmp280_read_thread= kthread_run(bmp280_read_temp_and_press,NULL,"bmp280 read temp&pressure thread");
+	bmp280_read_thread = kthread_run(bmp280_read_temp_and_press, NULL, "bmp280 read temp&pressure thread");
     return 0;
 }
 
 
-static int bmp280_remove(struct i2c_client *client) 
+static int bmp280_remove(struct i2c_client *client)
 {
-  	pr_err("%s: removing\n", BMP280_DEVICE_NAME);
+	pr_err("%s: removing\n", BMP280_DEVICE_NAME);
 	return 0;
 };
 
@@ -185,66 +186,70 @@ static void writeRtcTimeAndAlarm_work(struct work_struct *work)
 	struct tm tm_now;
 	uint8_t alarm_hour, alarm_minute;
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
-	
+
 	/* Store time and alarm values to RTC registers  */
 	ktime_get_real_ts64(&curr_tm);
 	time64_to_tm(curr_tm.tv_sec, 0, &tm_now);
-	data_buf[0]=val2rtc(tm_now.tm_sec); 		// DS3231_REG_SEC
-	data_buf[1]=val2rtc(tm_now.tm_min); 		// DS3231_REG_MIN
-	data_buf[2]=val2rtc(tm_now.tm_hour); 		// DS3231_REG_HOUR
-	data_buf[3]=val2rtc(tm_now.tm_wday); 		// DS3231_REG_WDAY
-	data_buf[4]=val2rtc(tm_now.tm_mday); 		// DS3231_REG_DAY
-	data_buf[5]=val2rtc(tm_now.tm_mon); 		// DS3231_REG_MON
-	data_buf[6]=val2rtc(tm_now.tm_year);    	// DS3231_REG_YEAR
-	data_buf[7]=0;					// DS3231_REG_ALARM_SEC
-	data_buf[8]=val2rtc((clock.alarm_sec%3600)/60);	// DS3231_REG_ALARM_MIN
-	data_buf[9]=val2rtc(clock.alarm_sec/3600);	// DS3231_REG_ALARM_HOUR
-	i2c_write_data (ds3231.client, DS3231_REG_SEC, data_buf,10);
+	data_buf[0] = val2rtc(tm_now.tm_sec); 		// DS3231_REG_SEC
+	data_buf[1] = val2rtc(tm_now.tm_min); 		// DS3231_REG_MIN
+	data_buf[2] = val2rtc(tm_now.tm_hour); 		// DS3231_REG_HOUR
+	data_buf[3] = val2rtc(tm_now.tm_wday); 		// DS3231_REG_WDAY
+	data_buf[4] = val2rtc(tm_now.tm_mday); 		// DS3231_REG_DAY
+	data_buf[5] = val2rtc(tm_now.tm_mon); 		// DS3231_REG_MON
+	data_buf[6] = val2rtc(tm_now.tm_year);    	// DS3231_REG_YEAR
+	data_buf[7] = 0;					// DS3231_REG_ALARM_SEC
+	data_buf[8] = val2rtc((clock.alarm_sec%3600)/60);	// DS3231_REG_ALARM_MIN
+	data_buf[9] = val2rtc(clock.alarm_sec/3600);	// DS3231_REG_ALARM_HOUR
+	i2c_write_data (ds3231.client, DS3231_REG_SEC, data_buf, 10);
 
 }
 
 
-static void ds3231_readRtcTimeAndAlarm(void) { 
+static void ds3231_readRtcTimeAndAlarm(void) 
+{
 	/* Read time and alarm values from RTC registers */
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
+
 	i2c_read_data(ds3231.client, DS3231_REG_SEC, data_buf, 10);
-	ds3231.sec = rtc2val(data_buf[0]);			//0=DS3231_REG_SEC	
+	ds3231.sec = rtc2val(data_buf[0]);			//0=DS3231_REG_SEC
 	ds3231.min = rtc2val(data_buf[1]);			//1=DS3231_REG_MIN
 	ds3231.hour = rtc2val(data_buf[2]);			//2=DS3231_REG_HOUR
 	ds3231.wday = rtc2val(data_buf[3]);			//3=DS3231_REG_WDAY
 	ds3231.mday = rtc2val(data_buf[4]);			//4=DS3231_REG_DAY
 	ds3231.mon = rtc2val(data_buf[5]);			//5=DS3231_REG_MON
 	ds3231.year = rtc2val(data_buf[6]);			//6=DS3231_REG_YEAR
-	clock.alarm_sec= (rtc2val(data_buf[9])*3600+rtc2val(data_buf[8])*60);	//8=DS3231_REG_ALARM_MIN & 9=DS3231_REG_ALARM_HOUR			   	
+	clock.alarm_sec = (rtc2val(data_buf[9])*3600+rtc2val(data_buf[8])*60);	//8=DS3231_REG_ALARM_MIN & 9=DS3231_REG_ALARM_HOUR			   	
 }
 
 static void writeOptions_work(struct work_struct *work)
 {
-	/*convert struct options to byte and store to reg*/	
+	/*convert struct options to byte and store to reg*/
 	uint8_t options_info;
+
 	memcpy(&options_info, &options, sizeof(options_info));
-	i2c_write_byte(ds3231.client, DS3231_REG_OPTIONS, options_info );
+	i2c_write_byte(ds3231.client, DS3231_REG_OPTIONS, options_info);
 }
 
 DECLARE_WORK(writeRtcTimeAndAlarm, writeRtcTimeAndAlarm_work);
 DECLARE_WORK(writeOptions, writeOptions_work);
 
-static void ds3231_readOptions(void) 	
+static void ds3231_readOptions(void)
 {
-	/*read byte from reg and store as struct*/	
+	/*read byte from reg and store as struct*/
 	uint8_t options_info;
+
 	options_info = i2c_read_byte(ds3231.client, DS3231_REG_OPTIONS);
 	memcpy(&options, &options_info, sizeof(options_info));
 }
 
-void ds3231_writeOptions(void) 	
+void ds3231_writeOptions(void)
 {
 	schedule_work(&writeOptions);
 }
 
 
 
-void ds3231_writeRtcTimeAndAlarm(void) 	
+void ds3231_writeRtcTimeAndAlarm(void)
 {
 	schedule_work(&writeRtcTimeAndAlarm);
 }
@@ -265,27 +270,27 @@ static int ds3231_probe(struct i2c_client *client,
 			pr_err("%s: probe failed\n", DC3231_DEVICE_NAME);
 			return -ENODEV;
 			}
-	else 	{
-		init_hw.ds3231_i2c_probed=1;
+	else	{
+		init_hw.ds3231_i2c_probed = 1;
 		pr_err("%s: probed\n", DC3231_DEVICE_NAME);
 		}
 	ds3231.client = client;
 	ds3231_readRtcTimeAndAlarm();
 	curr_tm_set.tv_sec = mktime64(ds3231.year + 1900, ds3231.mon + 1, ds3231.mday,
 			    ds3231.hour, ds3231.min, ds3231.sec);
-	pr_err("%s: set time of the day result %d\n",DC3231_DEVICE_NAME, do_settimeofday64(&curr_tm_set));
+	pr_err("%s: set time of the day result %d\n", DC3231_DEVICE_NAME, do_settimeofday64(&curr_tm_set));
 
-	ds3231_readOptions(); 
+	ds3231_readOptions();
 
 
 	return 0;
 }
 
 
-static int ds3231_remove(struct i2c_client *client) 
+static int ds3231_remove(struct i2c_client *client)
 {
 
-  	pr_err("%s: removing\n", DC3231_DEVICE_NAME);
+	pr_err("%s: removing\n", DC3231_DEVICE_NAME);
 	return 0;
 };
 
@@ -300,12 +305,14 @@ static int ds3231_remove(struct i2c_client *client)
 int mpu6050_read(void *pv)
 {
 	int8_t total_vector;
-	uint16_t step_timer=0xFFFF, sleep;
-	
+	uint16_t step_timer = 0xFFFF, sleep;
+	int8_t accel_delta_x;
+	int8_t accel_delta_y;
+
 
 	while (!kthread_should_stop()) {
-	
-		sleep=MPU6050_THREAD_SLEEP;
+
+		sleep = MPU6050_THREAD_SLEEP;
 		mutex_lock(&i2c_read);
 		mpu6050.accel_x = (i2c_read_byte(mpu6050.client, MPU6050_ACCEL_XOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_ACCEL_XOUT_H+1) << 8);
 		mpu6050.accel_y = (i2c_read_byte(mpu6050.client, MPU6050_ACCEL_YOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_ACCEL_YOUT_H+1) << 8);
@@ -313,28 +320,54 @@ int mpu6050_read(void *pv)
 		mpu6050.gyro_x = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_XOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_XOUT_H+1) << 8);
 		mpu6050.gyro_y = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_YOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_YOUT_H+1) << 8);
 		mpu6050.gyro_z = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_ZOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_ZOUT_H+1) << 8);
-		pr_err("New x: %d y:%d z:%d\n", mpu6050.accel_x, mpu6050.accel_y, mpu6050.accel_z);
-		pr_err("Default x: %d y:%d z:%d\n", mpu6050.accel_x_def, mpu6050.accel_y_def, mpu6050.accel_z_def);
+		//pr_err("New x: %d y:%d z:%d\n", mpu6050.accel_x, mpu6050.accel_y, mpu6050.accel_z);
+		//pr_err("Default x: %d y:%d z:%d\n", mpu6050.accel_x_def, mpu6050.accel_y_def, mpu6050.accel_z_def);
 		mutex_unlock(&i2c_read);
-		
-		/* Calculate values for game */ 
-		game.accel_delta_x=mpu6050.accel_x_def-mpu6050.accel_x;
-		game.accel_delta_y=mpu6050.accel_y_def-mpu6050.accel_y;
+
+		/* Calculate values for game */
+		accel_delta_x = mpu6050.accel_x_def-mpu6050.accel_x;
+		accel_delta_y = mpu6050.accel_y_def-mpu6050.accel_y;
+
+		//if (ABS(game.accel_delta_x) > 2) game.x+=game.accel_delta_x;
+		//if (ABS(game.accel_delta_y) > 2) game.y-=game.accel_delta_y;
+
+		if ((ABS(accel_delta_x) > 4) && (game.dir_x == 0)) {	
+						game.dir_x = ABS(accel_delta_x)/accel_delta_x;
+						game.dir_y = 0;
+						}
+
+		if ((ABS(accel_delta_y) > 4) && (game.dir_y == 0)) {
+						game.dir_y = ABS(accel_delta_y)/accel_delta_y;
+						game.dir_x = 0;
+						}
+
+		game.x += game.dir_x;
+		game.y -= game.dir_y;
+
+
+		if (game.x > (WIDTH-10))
+			game.x = WIDTH-10;
+		if (game.x < 20)
+			game.x = 10;
+		if (game.y > (HEIGHT-1))
+			game.y = HEIGHT-1;
+		if (game.y < 10)
+			game.y = 10;
 
 		/* Detect steps */
-		mpu6050.vector[mpu6050.vector_num]=int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y * 											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
+		mpu6050.vector[mpu6050.vector_num] = int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y * 											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
 
-		total_vector= (mpu6050.vector[!mpu6050.vector_num]-mpu6050.vector[mpu6050.vector_num]);
+		total_vector = (mpu6050.vector[!mpu6050.vector_num]-mpu6050.vector[mpu6050.vector_num]);
 
-		//pr_err ("Total vector %d \n",total_vector );
-		//if ( ABS(total_vector) > 6) pr_err ("Step \n");
-		if (total_vector > 10) 	{ 
-			pr_err ("Step \n");
+		//pr_err ("Total vector %d\n",total_vector );
+		//if ( ABS(total_vector) > 6) pr_err ("Step\n");
+		if (total_vector > 10)	{
+			pr_err("Step registered\n");
 			game.steps_count++;
-			mpu6050.vector[mpu6050.vector_num]=0;
+			mpu6050.vector[mpu6050.vector_num] = 0;
 			//sleep+=500;
 			}
-		mpu6050.vector_num=!mpu6050.vector_num;
+		mpu6050.vector_num =  !mpu6050.vector_num;
 		msleep(sleep);
 	}
 return 0;
@@ -345,6 +378,7 @@ static int mpu6050_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
 	int ret;
+
 	pr_err("%s: probing\n", MPU6050_DEVICE_NAME);
 	/*reporting probe to init */
 	ret = i2c_read_byte(client, 0x00);
@@ -352,8 +386,8 @@ static int mpu6050_probe(struct i2c_client *client,
 			pr_err("%s: probe failed\n", MPU6050_DEVICE_NAME);
 			return -ENODEV;
 			}
-	else 	{
-		init_hw.mpu6050_i2c_probed=1;
+	else	{
+		init_hw.mpu6050_i2c_probed = 1;
 		pr_err("%s: probed\n", MPU6050_DEVICE_NAME);
 		}
 	mpu6050.client = client;
@@ -364,27 +398,28 @@ static int mpu6050_probe(struct i2c_client *client,
 	/* Config gyro 250° per second range */
 	i2c_write_byte(mpu6050.client, MPU6050_GYRO_CONFIG, 0x0);
 
-	/* Config accelerometer 2D */  
+	/* Config accelerometer 2D */
 	i2c_write_byte(mpu6050.client, MPU6050_ACCEL_CONFIG, 0x0);
-	
-	mpu6050_read_thread= kthread_run(mpu6050_read,NULL,"mpu6050 read accel&gyro thread");
+
+	mpu6050_read_thread = kthread_run(mpu6050_read, NULL, "mpu6050 read accel&gyro thread");
 
 	msleep(100);
 
 	/* Calibrate default x,y,z values from first run */
-	mpu6050.accel_x_def=mpu6050.accel_x;
-	mpu6050.accel_y_def=mpu6050.accel_y;
-	mpu6050.accel_z_def=mpu6050.accel_z;
-	mpu6050.gyro_x_def=mpu6050.gyro_x;
-	mpu6050.gyro_y_def=mpu6050.gyro_y;
-	mpu6050.gyro_z_def=mpu6050.gyro_z;
+	mpu6050.accel_x_def = mpu6050.accel_x;
+	mpu6050.accel_y_def = mpu6050.accel_y;
+	mpu6050.accel_z_def = mpu6050.accel_z;
+	mpu6050.gyro_x_def = mpu6050.gyro_x;
+	mpu6050.gyro_y_def = mpu6050.gyro_y;
+	mpu6050.gyro_z_def = mpu6050.gyro_z;
+
 	return 0;
 };
 
-static int mpu6050_remove(struct i2c_client *client) 
+static int mpu6050_remove(struct i2c_client *client)
 {
 
-  	pr_err("%s: removing\n", MPU6050_DEVICE_NAME);
+	pr_err("%s: removing\n", MPU6050_DEVICE_NAME);
 	return 0;
 };
 
@@ -458,13 +493,13 @@ static struct i2c_driver mpu6050_driver = {
 /* pre-register Device table for mpu6050 END */
 
 
-int  sensors_init(void) 
-{	
+int  sensors_init(void)
+{
 	mutex_init(&i2c_read);
 	i2c_add_driver(&bmp280_driver);
 	i2c_add_driver(&ds3231_driver);
 	i2c_add_driver(&mpu6050_driver);
-	return 0; 
+	return 0;
 }
 
 void  sensors_deinit(void)

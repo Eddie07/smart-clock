@@ -21,6 +21,7 @@
 #include "include/project1.h"
 #include "include/panel.h"
 
+
 #define DEVICE_NAME		"st7735fb"
 
 
@@ -34,13 +35,19 @@
 
 /*Define colors for display modes */
 
-#define DISP_CLOCK_COLOR		0x0
+#define DISP_CLOCK_COLOR		BLUE_COLOR
 #define DISP_ALARM_COLOR		BLUE_COLOR
 #define DISP_NOTIF_COLOR		GREEN_COLOR
 #define DISP_TEMP_COLOR			BLUE_COLOR
 #define DISP_PRESS_COLOR		BLUE_COLOR
 #define DISP_PEDOMETER_COLOR		BLUE_COLOR
 #define DISP_OPTIONS_COLOR		BLUE_COLOR
+
+/*Define bmp header values */
+#define BMP_HEADER_IMAGE_START		0xa
+#define BMP_HEADER_WIDTH		0x12
+#define BMP_HEADER_HEIGHT		0x16
+#define BMP_HEADER_BPP			0x1c
 
 
 #define MAX_STRING_SIZE			(20)
@@ -51,10 +58,9 @@ uint8_t blink_bmask, notif_blink_bmask;
 
 static void st7735fb_draw_string(char *, uint16_t, uint16_t, const struct Bitmap *, uint8_t, uint16_t);
 static void draw_icon(uint8_t, uint16_t, uint16_t, uint16_t);
-static void st7735fb_display_notifications(void);
+static void st7735fb_notifications_overlay(void);
 void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled);
 void st7735fb_draw_point(uint16_t x, uint16_t y, uint16_t color);
-
 
 
 static struct timer_list digital_clock;//, digital_timer;
@@ -105,7 +111,7 @@ static void st7735_run_cfg(void)
 	do {
 		switch (st7735_cfg[i].cmd)
 		{
-			case 	ST7735_START:
+			case	ST7735_START:
 				break;
 			case ST7735_CMD:
 				st7735_write_cmd(st7735_cfg[i].data);
@@ -151,6 +157,7 @@ static void display_update_work(struct work_struct *work)
 	smem16 = (uint16_t *)st7735fb.spi_writebuf;
 	for (i = 0; i < HEIGHT; i++) {
 		int x;
+
 		for (x = 0; x < WIDTH; x++)
 		    smem16[x] = (vmem16[x]>>8)|(vmem16[x]<<8);
 		smem16 += WIDTH*BPP/16;
@@ -170,18 +177,19 @@ static void display_update_work(struct work_struct *work)
 }
 
 
-static void st7735fb_update_display (void)
+static void st7735fb_update_display(void)
 {
 
-	/*add to notification icons to view*/
-	st7735fb_display_notifications();
+	/*add to notification overlay*/
+	st7735fb_notifications_overlay();
+
 	schedule_work(&update_diplay);
 }
 
 static int st7735fb_init_display(void)
 {
-	
-	if (spi_w8r8(st7735fb.spi, ST7735_NOP)<0)
+
+	if (spi_w8r8(st7735fb.spi, ST7735_NOP) < 0)
 		return -ENODEV;
 	st7735_reset();
 	st7735_run_cfg();
@@ -205,8 +213,8 @@ void st7735fb_blank_display(void)
 
 void st7735fb_clear_blink_bmask(void)
 {
-        blink_bmask=0xFF;
-	notif_blink_bmask=0xFF;
+        blink_bmask = 0xFF;
+	notif_blink_bmask = 0xFF;
 }
 
 void st7735fb_options_display(void)
@@ -214,27 +222,33 @@ void st7735fb_options_display(void)
 {
 
 	switch (my_button.set_mode) {
-			case 1:	blink_bmask ^= 1 << 1;  // option clock 24hrs
+			case 1:	blink_bmask ^= 1 << 1;  // option clock 24hrs blinking
 				break;
-			case 2:	blink_bmask ^= 1 << 2;  // option alarm enabled
+			case 2:	blink_bmask ^= 1 << 2;  // option alarm blinking
+				break;
+			case 3:	blink_bmask ^= 1 << 3;  // option celsius blinking
 				break;
 			default:blink_bmask = 0xFF;
 				}
 
-	
+
 	/* clear screen */
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
 
 	st7735fb_draw_string("Options:", 0, 20, &font[FONT24], 14, DISP_OPTIONS_COLOR);
 
-	/* option is clock 24 hours */ 
+	/* option is clock 24 hours */
 	st7735fb_draw_string("clock 24 hours", 25, 55, &font[FONT16], 9, DISP_OPTIONS_COLOR);
-	/* option is alarm enabled */ 
+	/* option is alarm enabled */
 	st7735fb_draw_string("enable alarm", 25, 75, &font[FONT16], 9, DISP_OPTIONS_COLOR);
-	/* draw icon is clock 24 hours */
+	/* option is mouse enabled */
+	st7735fb_draw_string("temp in celsius", 25, 95, &font[FONT16], 9, DISP_OPTIONS_COLOR);
+	/* draw icon is щption enabled */
 	draw_icon((options.is_ampm ? 2 : 3), 5, 55, ((blink_bmask >> 1) & 1) ? DISP_OPTIONS_COLOR : 0);
-	/* draw icon is alarm enabled */
+	/* draw icon is option enabled */
 	draw_icon((options.is_alarm_enabled ? 3 : 2), 5, 75, ((blink_bmask >> 2) & 1) ? DISP_OPTIONS_COLOR : 0);
+	/* draw icon is alarm enabled */
+	draw_icon((options.is_temp_celsius ? 3 : 2), 5, 95, ((blink_bmask >> 3) & 1) ? DISP_OPTIONS_COLOR : 0);
 
 	st7735fb_update_display();
 }
@@ -265,9 +279,8 @@ void st7735fb_alarm_display(uint8_t alarm_hour, uint8_t alarm_min)
 		st7735fb_draw_string(time, 110, 55, &font[FONT24], 22, DISP_ALARM_COLOR);
 		/* draw tm_hour */
 		sprintf(time, "%2d", (alarm_hour != 12) ? (alarm_hour%12) : 12);
-	}
-	else    sprintf(time, "%02d", alarm_hour); 
-		
+	} else    sprintf(time, "%02d", alarm_hour); 
+
 	st7735fb_draw_string(time, 0, 40, &font[FONT48], 22, ((blink_bmask >> 2) & 1) ? DISP_ALARM_COLOR : 0);
 	/* draw tm_min */
 	sprintf(time, "%02d", alarm_min);
@@ -291,15 +304,15 @@ void st7735fb_clock_display(struct tm *tm)
 
 
 	switch (my_button.set_mode) {
-			case 1:	blink_bmask ^= 1 << 1;  // min
+			case 1:	blink_bmask ^= 1 << 1;  // min blinking
 				break;
-			case 2: blink_bmask ^= 1 << 2;  // hour
+			case 2: blink_bmask ^= 1 << 2;  // hour blinking
 				break;
-			case 3: blink_bmask ^= 1 << 3;  // day
+			case 3: blink_bmask ^= 1 << 3;  // day blinking
 				break;
-			case 4:	blink_bmask ^= 1 << 4;  // month
+			case 4:	blink_bmask ^= 1 << 4;  // month blinking
 				break;
-			case 5:	blink_bmask ^= 1 << 5;  // year
+			case 5:	blink_bmask ^= 1 << 5;  // year blinking
 				break;
 			default: blink_bmask = 0xFF;
 			}
@@ -340,7 +353,7 @@ void st7735fb_clock_display(struct tm *tm)
 		sprintf(time, ":  :");
 		st7735fb_draw_string(time, 38, 38, &font[FONT48], 18, DISP_CLOCK_COLOR);
 	} else {
-		sprintf (time, "%2d", (tm->tm_hour != 12) ? (tm->tm_hour%12) : 12);
+		sprintf(time, "%2d", (tm->tm_hour != 12) ? (tm->tm_hour%12) : 12);
 		st7735fb_draw_string(time, 0, 50, &font[FONT32], 14, ((blink_bmask >> 2) & 1) ? DISP_CLOCK_COLOR : 0);
 		/* draw tm_min */
 		sprintf(time, "%02d", tm->tm_min);
@@ -356,8 +369,6 @@ void st7735fb_clock_display(struct tm *tm)
 		st7735fb_draw_string(time, 110, 60, &font[FONT24], 12, DISP_CLOCK_COLOR);
 			}
 
-	st7735fb_draw_rectangle(50, 50, 80, 80, BLUE_COLOR, 1);
-
 	st7735fb_update_display();
 
 
@@ -369,7 +380,7 @@ void st7735fb_timer_display(void)
 
 {
 
-        static char timer[MAX_STRING_SIZE];
+	static char timer[MAX_STRING_SIZE];
 	sprintf(timer, "%lld", NS_TO_MSEC(our_timer.nsec));
 
 	/* clear screen */
@@ -385,7 +396,7 @@ void st7735fb_timer_display(void)
 void st7735fb_temp_and_press_display(void)
 
 {
-        static char value[MAX_STRING_SIZE];
+	static char value[MAX_STRING_SIZE];
 
 	/* clear screen */
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
@@ -405,7 +416,7 @@ void st7735fb_temp_and_press_display(void)
 void st7735fb_pedometer_display(void)
 
 {
-        static char value[MAX_STRING_SIZE];
+	static char value[MAX_STRING_SIZE];
 
 	/* clear screen */
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
@@ -418,20 +429,81 @@ void st7735fb_pedometer_display(void)
 
 }
 
+
+
+
 void st7735fb_game_display(void)
 
 {
-        static char value[MAX_STRING_SIZE];
+	static char disp_string[MAX_STRING_SIZE];
+	int i;
 
-	/* clear screen */
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
 
-	game.x+=game.accel_delta_x;
-	game.y-=game.accel_delta_y;
-	st7735fb_draw_string("Game:", 0, 20, &font[FONT16], 10, DISP_PEDOMETER_COLOR);
-	//st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, 1)
-	st7735fb_draw_point(game.x, game.y, DISP_PEDOMETER_COLOR);
 
+	if (!game.is_fruit)
+			{  get_random_bytes(&game.fruit_x, sizeof(game.fruit_x));
+			   get_random_bytes(&game.fruit_y, sizeof(game.fruit_y));
+			   game.fruit_x = game.fruit_x%(WIDTH-15)+10;
+			    game.fruit_y = game.fruit_x%(HEIGHT-15)+10;
+			   if (game.fruit_x > 20)
+			   	game.is_fruit = 1;
+
+	} else draw_icon(8, game.fruit_x-8, game.fruit_y-8, RED_COLOR);
+
+	for (i = 0; i < game.len; i++) 				
+			draw_icon(9, game.tail_x[i]-8, game.tail_y[i]-8, YELLOW_COLOR);
+
+	for (i = 5; i < game.len; i++)			
+	if  ((game.tail_x[i] < game.x+3) &&
+						(game.tail_x[i] > game.x-3) &&
+					        (game.tail_y[i] > game.y-3) && 
+						(game.tail_y[i] < game.y+3))
+					{
+
+							st7735fb_draw_string("GAME OVER", 30, 50, &font[FONT8], 10, RED_COLOR);
+							game.game_over = 1;
+					}
+	for (i = game.len; i > 0; i--) {
+		game.tail_x[i] = game.tail_x[i-1];
+		game.tail_y[i] = game.tail_y[i-1];
+		}
+	game.tail_x[0] = (uint16_t)game.x;
+	game.tail_y[0] = (uint16_t)game.y;
+
+	if (((game.x) < (game.fruit_x+10)) &&
+		(game.x > (game.fruit_x-10)) &&
+		(game.y > (game.fruit_y-10)) &&
+		(game.y < (game.fruit_y+10)) && game.is_fruit)	{
+					game.is_fruit = 0;
+					//if (!game.len%10)
+					game.len += 20;
+					}
+	//pr_err ("%d %d %d %d us fruit %d :", game.fruit_x, game.fruit_y, game.x, game.y,is_fruit );
+
+	if (game.dir_x > 0)
+		draw_icon(7, game.x-8, game.y-8, GREEN_COLOR);
+	if (game.dir_x < 0)
+		draw_icon(5, game.x-8, game.y-8, GREEN_COLOR);
+	if (game.dir_y > 0)
+		draw_icon(4, game.x-8, game.y-8, GREEN_COLOR);
+	if (game.dir_y < 0)
+		draw_icon(6, game.x-8, game.y-8, GREEN_COLOR);
+	//if (game.len<1000) game.len++;
+
+
+	/* clear screen */
+	//memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
+	//st7735fb_draw_string("Game:", 0, 20, &font[FONT16], 10, DISP_PEDOMETER_COLOR);
+	//st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, 1)
+
+
+
+	//st7735fb_draw_point(game.x, game.y, DISP_PEDOMETER_COLOR);
+	st7735fb_draw_rectangle(0, 0, WIDTH-1, HEIGHT-1, WHITE_COLOR, 0);
+	st7735fb_draw_rectangle(0, 0, WIDTH-1, 15, WHITE_COLOR, 0);
+	sprintf(disp_string, "%06d", game.len-20);
+	st7735fb_draw_string(disp_string, 5, 5, &font[FONT8], 8, WHITE_COLOR);
 	st7735fb_update_display();
 
 }
@@ -439,13 +511,13 @@ void st7735fb_game_display(void)
 
 
 
-static void st7735fb_display_notifications(void)
+static void st7735fb_notifications_overlay(void)
 {
 
 	if (options.is_alarm_enabled)
 		draw_icon(0, 0, 0, DISP_NOTIF_COLOR);
 	if ((our_timer.nsec) && (my_button.mode != TIMER)) {
-		notif_blink_bmask ^= 1 << 1; 
+		notif_blink_bmask ^= 1 << 1;
 		draw_icon(1, 25, 0, ((notif_blink_bmask >> 1) & 1) ? DISP_NOTIF_COLOR : 0);
 	}
 
@@ -460,14 +532,15 @@ static void draw_char(char letter, uint16_t x, uint16_t y, const struct Bitmap *
 	 (font->width / 8 + (font->width % 8 ? 1 : 0));
 
 	uint8_t *ptr = &font->table[char_offset];
+
 	for (yc = 0; yc < font->height; yc++)
 	{
 		for (xc = 0; xc < font->width; xc++)
 		{
-       			 if (*ptr & (0x80 >> (xc % 8)))
-        			vmem16[(y+yc)*WIDTH+(x+xc)] = color;
-			 if (xc % 8 == 7)
-			 	ptr++;
+			 if (*ptr & (0x80 >> (xc % 8)))
+				vmem16[(y+yc)*WIDTH+(x+xc)] = color;
+			if (xc % 8 == 7)
+				ptr++;
 		}
 		if (font->width % 8 != 0)
 			ptr++;
@@ -484,14 +557,15 @@ static void draw_icon(uint8_t icon, uint16_t x, uint16_t y, uint16_t color)
 	 (icons.width / 8 + (icons.width % 8 ? 1 : 0));
 
 	uint8_t *ptr = &icons.table[icon_offset];
+
 	for (yc = 0; yc < icons.height; yc++)
 	{
 		for (xc = 0; xc < icons.width; xc++)
 		{
-       			 if (*ptr & (0x80 >> (xc % 8)))
-        			vmem16[(y+yc)*WIDTH+(x+xc)] = color;
-			 if (xc % 8 == 7)
-			 	ptr++;
+			 if (*ptr & (0x80 >> (xc % 8)))
+				vmem16[(y+yc)*WIDTH+(x+xc)] = color;
+			if (xc % 8 == 7)
+				ptr++;
 		}
 		if (icons.width % 8 != 0)
 			ptr++;
@@ -516,14 +590,14 @@ void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye,
 
 {
 	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint16_t x = 0, y=0;
+	uint16_t x = 0, y = 0;
 
 	for (x = 0; x < WIDTH; x++)
 			for (y = 0; y < HEIGHT; y++) {
-				if (((x==xs) || (x==xe)) && ((y>=ys) && (y<=ye)) || ((y==ys) || (y==ye)) && ((x>=xs) && (x<=xe)))
+				if (((x == xs) || (x == xe)) && ((y >= ys) && (y <= ye)) || ((y == ys) || (y == ye)) && ((x >= xs) && (x <= xe)))
 														vmem16[(y)*WIDTH+(x)] = color;
-				if (filled) 
-						if (((x>=xs) && (x<=xe)) && ((y>=ys) && (y<=ye)))
+				if (filled)
+						if (((x >= xs) && (x <= xe)) && ((y >= ys) && (y <= ye)))
 														vmem16[(y)*WIDTH+(x)] = color;
 			}
 
@@ -533,11 +607,13 @@ void st7735fb_draw_point(uint16_t x1, uint16_t y1, uint16_t color)
 
 {
 	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint16_t x=0, y=0;
+	uint16_t x = 0, y = 0;
+
 	for (x = 0; x < WIDTH; x++)
-			for (y = 0; y < HEIGHT; y++) {															
-				if (x==x1 && y==y1) vmem16[(y)*WIDTH+(x)] = color;
-																		
+			for (y = 0; y < HEIGHT; y++) {
+				if (x == x1 && y == y1)
+					vmem16[(y)*WIDTH+(x)] = color;
+
 			}
 
 }
@@ -546,16 +622,68 @@ void st7735fb_draw_point(uint16_t x1, uint16_t y1, uint16_t color)
 void st7735fb_draw_buff_display(void)
 {
 	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	int y = 0, x = 0, i = 0x7b;
-		for (x = 0; x < WIDTH; x++)
-			for (y = 0; y < HEIGHT; y++) {
-        			vmem16[(y)*WIDTH+(x)] = (fs_buffer[i++]<<11)|(fs_buffer[i++]<<5)|fs_buffer[i++];
-				i++; }
 
+	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
+
+	int y, x, xs = 0, ys = 0, start_byte, bmp_x, bmp_y, header, i = 0;
+
+	bmp_x = fs_buffer.buf[BMP_HEADER_WIDTH];
+	bmp_y = fs_buffer.buf[BMP_HEADER_HEIGHT];
+	header = fs_buffer.buf[BMP_HEADER_IMAGE_START]+1; // fs_buffer[14] | fs_buffer[15]<<8 | fs_buffer[15]<<16 | fs_buffer[17]<<24;
+	if ((bmp_x > WIDTH) || (bmp_y > HEIGHT )) {
+		st7735fb_draw_string("Not supported size", 5, 50, &font[FONT16], 8, RED_COLOR);
+		goto err;
+	}
+
+	if (bmp_x < WIDTH)
+		xs = (WIDTH-bmp_x)/2;
+	else
+		bmp_x = WIDTH;
+
+	if (bmp_y < HEIGHT)
+		ys = (HEIGHT-bmp_y)/2;
+	else
+		bmp_y = HEIGHT;
+
+	while (y < bmp_y) {
+
+		while (x < bmp_x) {
+
+
+				if (fs_buffer.buf[BMP_HEADER_BPP] == 0x10)
+        			vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 8) | (fs_buffer.buf[header++]);
+				if (fs_buffer.buf[BMP_HEADER_BPP] == 0x18)
+				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 16) | (fs_buffer.buf[header++] << 8) | (fs_buffer.buf[header++]);
+				if (fs_buffer.buf[BMP_HEADER_BPP] == 0x20)
+				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 24) | (fs_buffer.buf[header++] << 16) | (fs_buffer.buf[header++] << 8) | (fs_buffer.buf[header++]);
+
+				//if (i> bmp_x*bmp_y) i=bmp_x*bmp_y;
+				x++;
+				}
+			 x = 0;
+			 y++;
+	}
+err:
 	st7735fb_update_display();
 
 }
 
+void st7735fb_draw_obj(uint16_t xs, uint16_t ys, uint16_t size)
+
+{
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+	uint16_t x = 0, y = 0;
+
+	for (x = 0; x < WIDTH; x++)
+			for (y = 0; y < HEIGHT; y++) {
+				//if (((x==xs) || (x==xe)) && ((y>=ys) && (y<=ye)) || ((y==ys) || (y==ye)) && ((x>=xs) && (x<=xe)))
+														//vmem16[(y)*WIDTH+(x)] = color;
+				//if (filled)
+						if (((x >= xs) && (x <= xs+size)) && ((y >= ys) && (y <= ys+size)))
+														vmem16[(y)*WIDTH+(x)] = BLUE_COLOR;
+			}
+
+}
 
 static int st7735fb_probe(struct spi_device *spi)
 {
@@ -568,7 +696,7 @@ static int st7735fb_probe(struct spi_device *spi)
 
 	pr_err("%s: probe started\n", DEVICE_NAME);
 
-	
+
 	spi->mode = SPI_MODE_0;
 	status = spi_setup(spi);
 
@@ -580,7 +708,7 @@ static int st7735fb_probe(struct spi_device *spi)
 
 	st7735fb.spi = spi;
 	st7735fb.dc = of_get_named_gpio(np, "dc-gpios", 0);
-	st7735fb.rst = of_get_named_gpio(np, "reset-gpios", 0); 
+	st7735fb.rst = of_get_named_gpio(np, "reset-gpios", 0);
 
 	/* Request GPIOs and initialize to default values */
 	if (gpio_request_one(st7735fb.rst, GPIOF_OUT_INIT_HIGH, "ST7735 Reset Pin")) {
@@ -588,9 +716,10 @@ static int st7735fb_probe(struct spi_device *spi)
 			retval = -EBUSY;
 			goto gpio_fail;
 			}
-	if (gpio_request_one(st7735fb.dc, GPIOF_OUT_INIT_LOW, "ST7735 Data/Command Pin")) {;
+	if (gpio_request_one(st7735fb.dc, GPIOF_OUT_INIT_LOW, "ST7735 Data/Command Pin"))
+		{
 			pr_err("%s: Cannot request GPIO\n", DEVICE_NAME);
-			retval= -EBUSY;
+			retval = -EBUSY;
 			goto gpio_fail;
 			}
 
@@ -611,12 +740,12 @@ static int st7735fb_probe(struct spi_device *spi)
 		goto alloc_fail;
 		}
 	st7735fb.spi_writebuf = spi_writebuf;
-	
+
 
 	retval = st7735fb_init_display();
-		
-	/*reporting probe to init */	
-	init_hw.st7735_spi_probed=1;
+
+	/*reporting probe to init */
+	init_hw.st7735_spi_probed = 1;
 
 	return retval;
 
@@ -631,7 +760,19 @@ gpio_fail:
 	return retval;
 };
 
+int  st7735fb_remove(struct spi_device *spi)
+{
+	struct player *next;
 
+	pr_err("%s: deregistering\n", DEVICE_NAME);
+	msleep(100);
+	kfree(st7735fb.screen_base);
+	kfree(st7735fb.spi_writebuf);
+	gpio_free(st7735fb.dc);
+	gpio_free(st7735fb.rst);
+	pr_err("%s: module unloaded\n", DEVICE_NAME);
+	return 0;
+}
 
 static const struct of_device_id st7735fb_of_match_table[] = {
 	{
@@ -641,18 +782,7 @@ static const struct of_device_id st7735fb_of_match_table[] = {
 };
 MODULE_DEVICE_TABLE(of, st7735fb_of_match_table);
 
-int  st7735fb_remove(struct spi_device *spi)
-{
 
-	pr_err("%s: deregistering\n", DEVICE_NAME);
-	msleep(100);
-	kfree(st7735fb.screen_base);
-	kfree(st7735fb.spi_writebuf);
-	gpio_free(st7735fb.dc);
-	gpio_free(st7735fb.rst);
-	pr_err("%s: module unloaded \n", DEVICE_NAME);
-	return 0;
-}
 
 
 struct spi_driver st7735fb_driver = {
@@ -678,5 +808,9 @@ void st7735fb_exit(void)
 	spi_unregister_driver(&st7735fb_driver);
 
 }
+
+
+
+
 
 

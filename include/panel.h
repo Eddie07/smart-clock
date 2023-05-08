@@ -1,12 +1,10 @@
 #ifndef __PANEL_H_INCLUDED
 #define __PANEL_H_INCLUDED
 
-
 #define WIDTH		160
 #define HEIGHT		128
 #define BPP		16
 #define MEM_SIZE        WIDTH*HEIGHT*BPP/8;
-
 
 
 /* ST7735 Commands */
@@ -52,7 +50,8 @@
 #define ST7735_MADCTL_ML 0x10
 #define ST7735_MADCTL_RGB 0x00
 
-#include <asm/io.h>
+
+#include "font8.h"
 #include "font16.h"
 #include "font24.h"
 #include "font32.h"
@@ -66,14 +65,16 @@ struct Bitmap {
   };
 
 struct Bitmap font[] = {
+				{ font8_table, 8, 8},
 				{ font16_table, 11, 16},
 				{ font24_table, 17, 24 },
-				{ font32_table, 16, 32 },
+				{ font32_table, 32, 32 },
 				{ font48_table, 24, 48 },
 };
 
 enum fonts {
-FONT16 = 0,
+FONT8 =0,
+FONT16,
 FONT24,
 FONT32,
 FONT48,

@@ -19,19 +19,19 @@
 
 
 /* use the same refresh timer value for all view modes to blink notification for timer on with same frequency */
-#define DISP_TIME_REFRESH_TIME 200 	//5 fps
+#define DISP_TIME_REFRESH_TIME 200	//5 fps
 #define DISP_TIMER_REFRESH_TIME_NS 17	//58 fps
 #define DISP_ALARM_REFRESH_TIME 200     //5 fps
 #define DISP_TEMP_AND_PRESS_REFRESH_TIME 200 //5 fps
 #define DISP_PEDOMETER_REFRESH_TIME 200 //5 fps
-#define DISP_GAME_REFRESH_TIME 100 //10 fps
+#define DISP_GAME_REFRESH_TIME 40 //20 fps
 #define DISP_OPTIONS_REFRESH_TIME 200	//5 fps
 
 #define SEC		(60)
 #define SECS_PER_HOUR	(60 * 60)
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
 #define ISLP(y) (((y % 400 == 0) && (y % 100 == 0)) || (y % 4 == 0))
-#define GDBM(m,y) ((m == 2) ? (ISLP(y) ? 29 : 28) : ((m % 2) ? 31 : 30))
+#define GDBM(m, y) ((m == 2) ? (ISLP(y) ? 29 : 28) : ((m % 2) ? 31 : 30))
 
 
 static struct hrtimer digital_timer_view;
@@ -48,19 +48,19 @@ struct clock_timer our_timer;
 	struct timespec64 curr_tm;
 	struct tm tm_now;
 	uint64_t time_sec;
-	
-	
+
+
 
     while (!kthread_should_stop()) {
-	
+
 	ktime_get_real_ts64(&curr_tm);
 	time64_to_tm(curr_tm.tv_sec, 0, &tm_now);
 	//mutex_lock(&etx_mutex);
        // etx_global_variable++;
-	
+
 
 	time_sec=tm_now.tm_hour*SECS_PER_HOUR + tm_now.tm_min*SEC;
-	//pr_err ("%lld %d \n", time_sec, clock.alarm_sec);
+	//pr_err ("%lld %d\n", time_sec, clock.alarm_sec);
 	if ((my_button.mode != ALARM) && (time_sec==clock.alarm_sec))
 		{	pr_info("Alarm working\n");
 			st7735fb_temp_and_press_display();
@@ -78,7 +78,7 @@ void show_timer_view(void)
 {
 	uint32_t disp_timer;
 
-	pr_err ("Display mode %d\n", my_button.mode);
+	pr_err("Display mode %d\n", my_button.mode);
 	if  (our_timer.nsec)
 		our_timer.nsec_current_ktime = ktime_get_real_ns()-our_timer.nsec_old_ktime+our_timer.nsec;
 	else
@@ -89,55 +89,60 @@ void show_timer_view(void)
 
 void show_clock_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	my_button.set_mode = 0;
 	mod_timer(&digital_clock_view,
 			jiffies + msecs_to_jiffies(DISP_TIME_REFRESH_TIME));
 }
 
-void show_options_view (void)
+void show_options_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
 	st7735fb_options_display();
 	mod_timer(&options_view,
 			jiffies + msecs_to_jiffies(DISP_OPTIONS_REFRESH_TIME));
 }
 
-void show_alarm_view (void)
+void show_alarm_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
 	st7735fb_alarm_display(clock.alarm_sec/3600, (clock.alarm_sec%3600)/60);
 	mod_timer(&alarm_view,
 			jiffies + msecs_to_jiffies(DISP_ALARM_REFRESH_TIME));
 }
 
-void show_temp_and_press_view (void)
+void show_temp_and_press_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
 	st7735fb_temp_and_press_display();
 	mod_timer(&temp_and_press_view,
 			jiffies + msecs_to_jiffies(DISP_TEMP_AND_PRESS_REFRESH_TIME));
 }
 
-void show_pedometer_view (void)
+void show_pedometer_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
 	st7735fb_pedometer_display();
 	mod_timer(&pedometer_view,
 			jiffies + msecs_to_jiffies(DISP_PEDOMETER_REFRESH_TIME));
 }
 
-void show_game_view (void)
+void show_game_view(void)
 {
-	pr_err ("Display mode %d\n",  my_button.mode);
+	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
-	
-	game.x=60;
-	game.y=40;
+
+	game.tail_x = kcalloc(1000, sizeof(uint16_t), GFP_KERNEL);
+	game.tail_y = kcalloc(1000, sizeof(uint16_t), GFP_KERNEL);
+	game.len = 20;
+	game.is_fruit = 0;
+	game.x = 80;
+	game.y = 80;
+	game.game_over = 0;
 	st7735fb_game_display();
 	mod_timer(&game_view,
 			jiffies + msecs_to_jiffies(DISP_GAME_REFRESH_TIME));
@@ -149,7 +154,7 @@ void show_game_view (void)
 static enum hrtimer_restart digital_timer_view_callback(struct hrtimer *timer)
 
 {
-	/* when button longpress x1 detected erasing timer */ 
+	/* when button longpress x1 detected erasing timer */
 	if ((my_button.state == 2) && (!our_timer.timer_start)) {
 		our_timer.nsec_stored = 0;
 		our_timer.nsec = 0;
@@ -174,11 +179,9 @@ static enum hrtimer_restart digital_timer_view_callback(struct hrtimer *timer)
 	else
 		our_timer.nsec_current_ktime = ktime_get_real_ns();
 
-
-	if (my_button.mode == TIMER)
-	{
+	if (my_button.mode == TIMER) {
 		st7735fb_timer_display();
-    		hrtimer_forward_now(timer, ms_to_ktime(DISP_TIMER_REFRESH_TIME_NS));
+		hrtimer_forward_now(timer, ms_to_ktime(DISP_TIMER_REFRESH_TIME_NS));
 		return HRTIMER_RESTART;
 	} else {
 		return HRTIMER_NORESTART;
@@ -186,7 +189,7 @@ static enum hrtimer_restart digital_timer_view_callback(struct hrtimer *timer)
 }
 
 
-static void digital_clock_view_callback (struct timer_list *t)
+static void digital_clock_view_callback(struct timer_list *t)
 {
 
 	struct timespec64 curr_tm;
@@ -194,10 +197,10 @@ static void digital_clock_view_callback (struct timer_list *t)
 
 	ktime_get_real_ts64(&curr_tm);
 
-	/* when button longpress x1 detected turning on setup mode */ 
+	/* when button longpress x1 detected turning on setup mode */
 	if (my_button.state == 2 && !my_button.is_longpress && !my_button.set_mode) {
 		my_button.set_mode = 1;
-		my_button.state = 0;		
+		my_button.state = 0;
 		//clock.current_sec=curr_tm.tv_sec;
 		//clock.stored_date=clock.current_sec-tm_now.tm_hour*3600+tm_now.tm_min*60+tm_now.tm_sec;
 
@@ -207,7 +210,7 @@ static void digital_clock_view_callback (struct timer_list *t)
 	if (my_button.state == 3 && my_button.set_mode) {
 		my_button.set_mode++;
 		my_button.state = 0;
-		st7735fb_clear_blink_bmask(); //clear blinking bits 
+		st7735fb_clear_blink_bmask(); //clear blinking bits
 		curr_tm.tv_sec = clock.current_sec;
 		do_settimeofday64(&curr_tm);
 		ds3231_writeRtcTimeAndAlarm();
@@ -230,13 +233,13 @@ static void digital_clock_view_callback (struct timer_list *t)
 			/*adjust min */
 			case 1:	clock.current_sec += SEC;
 				time64_to_tm(clock.current_sec, 0, &tm_now);
-				if (tm_now.tm_hour != tm_stored.tm_hour) 
+				if (tm_now.tm_hour != tm_stored.tm_hour)
 						clock.current_sec -= SECS_PER_HOUR;
 				break;
 			/*adjust hours */
 			case 2:	clock.current_sec += SECS_PER_HOUR;
 				time64_to_tm(clock.current_sec, 0, &tm_now);
-				if (tm_now.tm_mday != tm_stored.tm_mday) 
+				if (tm_now.tm_mday != tm_stored.tm_mday)
 						clock.current_sec -= SECS_PER_DAY;
 				break;
 			/*adjust days */
@@ -248,8 +251,8 @@ static void digital_clock_view_callback (struct timer_list *t)
 			/*adjust month */
 			case 4:	clock.current_sec += GDBM(tm_now.tm_mon+1, tm_now.tm_year)*SECS_PER_DAY;
 				time64_to_tm(clock.current_sec, 0, &tm_now);
-				if (tm_now.tm_year != tm_stored.tm_year) 
-						clock.current_sec -= (ISLP(tm_stored.tm_year) ? 366*SECS_PER_DAY : 365*SECS_PER_DAY); 
+				if (tm_now.tm_year != tm_stored.tm_year)
+						clock.current_sec -= (ISLP(tm_stored.tm_year) ? 366*SECS_PER_DAY : 365*SECS_PER_DAY);
 				break;
 			/*adjust year (max 2050) */
 			case 5:	clock.current_sec += (ISLP(tm_stored.tm_year) ? 366*SECS_PER_DAY : 365*SECS_PER_DAY);
@@ -265,7 +268,7 @@ static void digital_clock_view_callback (struct timer_list *t)
 	time64_to_tm(clock.current_sec, 0, &tm_now);
 
 
-	if (my_button.mode == CLOCK) { 
+	if (my_button.mode == CLOCK) {
 		st7735fb_clock_display(&tm_now);
 		mod_timer(&digital_clock_view,
 			jiffies + msecs_to_jiffies(DISP_TIME_REFRESH_TIME));
@@ -273,9 +276,9 @@ static void digital_clock_view_callback (struct timer_list *t)
 
 }
 
-static void alarm_view_callback (struct timer_list *t)
+static void alarm_view_callback(struct timer_list *t)
 {
-	/* when button longpress x1 detected turning on setup mode */ 
+	/* when button longpress x1 detected turning on setup mode */
 	if (my_button.state == 2 && !my_button.is_longpress && !my_button.set_mode) {
 		my_button.set_mode = 1;
 		my_button.state = 0;
@@ -296,12 +299,12 @@ static void alarm_view_callback (struct timer_list *t)
 			/*adjust min */
 			case 1: clock.alarm_sec += SEC;
 				if (clock.stored_alarm_sec/SECS_PER_HOUR != clock.alarm_sec/SECS_PER_HOUR)
-					clock.alarm_sec-=SECS_PER_HOUR;
+					clock.alarm_sec -= SECS_PER_HOUR;
 				break;
 			/*adjust hours */
 			case 2:	clock.alarm_sec += SECS_PER_HOUR;
 				if (clock.stored_alarm_sec/SECS_PER_DAY != clock.alarm_sec/SECS_PER_DAY)
-					clock.alarm_sec-=SECS_PER_DAY;
+					clock.alarm_sec -= SECS_PER_DAY;
 				break;
 						}
 		my_button.state = 0;
@@ -311,16 +314,16 @@ static void alarm_view_callback (struct timer_list *t)
 		clock.stored_sec = clock.current_sec;
 	}
 
-	if (my_button.mode == ALARM) { 
+	if (my_button.mode == ALARM) {
 		st7735fb_alarm_display(clock.alarm_sec/3600, (clock.alarm_sec%3600)/60);
 		mod_timer(&alarm_view,
 			jiffies + msecs_to_jiffies(DISP_TIME_REFRESH_TIME));
 	}
 }
 
-static void options_view_callback (struct timer_list *t)
+static void options_view_callback(struct timer_list *t)
 {
-	/* when button longpress x1 detected turning on setup mode */ 
+	/* when button longpress x1 detected turning on setup mode */
 	if (my_button.state == 2 && !my_button.is_longpress && !my_button.set_mode) {
 		my_button.set_mode = 1;
 		my_button.state = 0;
@@ -332,54 +335,62 @@ static void options_view_callback (struct timer_list *t)
 		my_button.state = 0;
 		st7735fb_clear_blink_bmask();
 		ds3231_writeOptions();
-		if (my_button.set_mode == 3)
+		if (my_button.set_mode == 4)
 			my_button.set_mode = 0;
 	}
 	/* when button press detected switching values depending on current setup mode */
 	if (my_button.state == 1) {
 		switch (my_button.set_mode) {
-			case 1: options.is_ampm =  !options.is_ampm;
+			case 1: options.is_ampm = !options.is_ampm;
 				break;
-			case 2: options.is_alarm_enabled =!options.is_alarm_enabled;
+			case 2: options.is_alarm_enabled = !options.is_alarm_enabled;
 				break;
-						}
+			case 3: options.is_temp_celsius = !options.is_temp_celsius;
+				break;
+		}
 		my_button.state = 0;
 		}
 
-	if (my_button.mode == OPTIONS) { 
+	if (my_button.mode == OPTIONS) {
 		st7735fb_options_display();
 		mod_timer(&options_view,
 			jiffies + msecs_to_jiffies(DISP_OPTIONS_REFRESH_TIME));
 	}
 }
 
-static void temp_and_press_view_callback (struct timer_list *t)
+static void temp_and_press_view_callback(struct timer_list *t)
 {
 
-	if (my_button.mode == TEMP_AND_PRESS) { 
+	if (my_button.mode == TEMP_AND_PRESS) {
 		st7735fb_temp_and_press_display();
 		mod_timer(&temp_and_press_view,
 			jiffies + msecs_to_jiffies(DISP_TEMP_AND_PRESS_REFRESH_TIME));
 	}
 }
 
-static void pedometer_view_callback (struct timer_list *t)
+static void pedometer_view_callback(struct timer_list *t)
 {
 
-	if (my_button.mode == PEDOMETER) { 
+	if (my_button.mode == PEDOMETER) {
 		st7735fb_pedometer_display();
 		mod_timer(&pedometer_view,
 			jiffies + msecs_to_jiffies(DISP_PEDOMETER_REFRESH_TIME));
 	}
 }
 
-static void game_view_callback (struct timer_list *t)
+static void game_view_callback(struct timer_list *t)
 {
 
-	if (my_button.mode == GAME) { 
+	if ((my_button.mode == GAME) && (!game.game_over)) {
 		st7735fb_game_display();
 		mod_timer(&game_view,
 			jiffies + msecs_to_jiffies(DISP_GAME_REFRESH_TIME));
+	} else {
+	if (game.tail_x != NULL)
+		kfree(game.tail_x);
+	if (game.tail_y != NULL)
+		kfree(game.tail_y);
+
 	}
 }
 
@@ -393,7 +404,7 @@ void init_controls(void)
 		/*setup display HR timer for clock timer refresh mode */
 		hrtimer_init(&digital_timer_view, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
 		digital_timer_view.function = &digital_timer_view_callback;
-		
+
 		/*setup alarm view mode refresh timer */
 		timer_setup(&alarm_view, alarm_view_callback, 0);
 
@@ -412,8 +423,13 @@ void init_controls(void)
 	}
 
 
-void  deinit_controls(void)	
+void  deinit_controls(void)
 {
+	if (game.tail_x != NULL)
+		kfree(game.tail_x);
+	if (game.tail_y != NULL)
+		kfree(game.tail_y);
+
 	del_timer_sync(&game_view);
 	del_timer_sync(&pedometer_view);
 	del_timer_sync(&temp_and_press_view);

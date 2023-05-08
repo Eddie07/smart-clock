@@ -24,10 +24,9 @@ static int is_open;
 static struct cdev smart_clock_cdev;
 static struct class *dev_class;
 struct init_hw  init_hw;
+struct fs_buffer fs_buffer = { .buf = NULL };
 
 //unsigned char fs_buffer[BUFFER_MAX_SIZE] = {0};
-char *fs_buffer;
-size_t fs_buffer_size;
 
 
 
@@ -88,12 +87,12 @@ static int  __init smart_clock_main(void)
 		}
 
 	st7735fb_init();
-	if (!init_hw.st7735_spi_probed) { 
+	if (!init_hw.st7735_spi_probed) {
 		pr_err("st7735 spi panel init fail\n");
 		goto hw_panel_fail;
 		}
 	sensors_init();
-	if (!init_hw.bmp280_i2c_probed) { 
+	if (!init_hw.bmp280_i2c_probed) {
 		pr_err("bmp280 i2c sensor init fail\n");
 		goto hw_sensors_fail;
 		}
@@ -105,14 +104,14 @@ static int  __init smart_clock_main(void)
 		pr_err("mpu6050 i2c sensor init fail\n");
 		goto hw_sensors_fail;
 		}
-	
+
 	init_controls();
 
 
 return 0;
 
 
-hw_sensors_fail:	
+hw_sensors_fail:
 	sensors_deinit();
 hw_panel_fail:
 	st7735fb_exit();
@@ -134,7 +133,7 @@ return -1;
 
 static void  __exit smart_clock_exit(void)
 {
-	kfree(fs_buffer);
+	kfree(fs_buffer.buf);
 	deinit_controls();
 	sensors_deinit();
 	gpio_button_deinit();
@@ -143,7 +142,7 @@ static void  __exit smart_clock_exit(void)
 	class_destroy(dev_class);
 	cdev_del(&smart_clock_cdev);
 	unregister_chrdev_region(dev, 1);
-	pr_err("module unloaded \n");
+	pr_err("module unloaded\n");
 }
 
 
@@ -169,14 +168,14 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 {
 	ssize_t ret;
 
-	if (*offset >= fs_buffer_size) {
+	if (*offset >= fs_buffer.buf_len) {
 		/* we have finished to read, return 0 */
 		ret  = 0;
 	} else {
 		/* fill the buffer, return the buffer size */
-		copy_to_user(buffer, fs_buffer, fs_buffer_size);
-		*offset += fs_buffer_size;
-		ret = fs_buffer_size;
+		copy_to_user(buffer, fs_buffer.buf, fs_buffer.buf_len);
+		*offset += fs_buffer.buf_len;
+		ret = fs_buffer.buf_len;
 	}
 	return ret;
 }
@@ -184,7 +183,7 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 static ssize_t device_file_write(struct file *filp, const char __user *buffer, size_t count, loff_t *offset)
 {
 
-	fs_buffer_size = count; //store buffer size
+	fs_buffer.buf_len = count; //store buffer size
 	//memset(fs_buffer, 0, BUFFER_MAX_SIZE); //clear buffer from old garbage
 
 	/* check for write buffer overflow > 1024 */
@@ -194,18 +193,18 @@ static ssize_t device_file_write(struct file *filp, const char __user *buffer, s
 
 	/* get value */
 
-	fs_buffer = kzalloc(count + 1, GFP_ATOMIC);
-	if (!fs_buffer) {
+	fs_buffer.buf = kzalloc(count + 1, GFP_ATOMIC);
+	if (fs_buffer.buf == NULL) {
 		pr_err("malloc failed");
-		return -EINVAL;
+		return -ENOMEM;
 	}
-	if (copy_from_user(fs_buffer, buffer, fs_buffer_size)) {
+	if (copy_from_user(fs_buffer.buf, buffer, fs_buffer.buf_len)) {
 		pr_err("sysfs write failed\n");
 		return -EFAULT;
 	}
 
 
-	pr_err(" Driver write bytes %lld\n", fs_buffer_size);
+	pr_err(" Driver write bytes %lld\n", fs_buffer.buf_len);
 	st7735fb_draw_buff_display();
 	//if (!memcmp(fs_buffer, "clean", strlen("clean"))) st7735fb_blank_display();
 	//if (!memcmp(fs_buffer, "word", strlen("word"))) st7735fb_draw_string(word);
