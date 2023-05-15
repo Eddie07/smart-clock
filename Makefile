@@ -7,7 +7,10 @@ smart_clock-m := \
 	sc_panel.o \
 	sc_sensors.o
 
-EXTRA_CFLAGS += -Wno-unused-variable -Wno-unused-result
+EXTRA_CFLAGS += \
+	-Wno-unused-variable \
+	-Wno-unused-result \
+	-Wno-sequence-point
 
 KDIR ?= ../../kernel_old/linux/
 ARCH ?= arm
