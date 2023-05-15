@@ -371,6 +371,11 @@ static void temp_and_press_view_callback(struct timer_list *t)
 static void pedometer_view_callback(struct timer_list *t)
 {
 
+	/* Reset pedometer when button is pressed */
+	if (my_button.state == 1) {
+		game.steps_count = 0;
+		my_button.state = 0;
+		}
 	if (my_button.mode == PEDOMETER) {
 		st7735fb_pedometer_display();
 		mod_timer(&pedometer_view,
