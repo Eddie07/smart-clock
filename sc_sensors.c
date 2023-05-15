@@ -24,12 +24,13 @@
 #define DC3231_DEVICE_NAME	"ds3231"
 #define MPU6050_DEVICE_NAME	"mpu6050"
 
-#define DC3231_THREAD_SLEEP     (10000) //ms
-#define MPU6050_THREAD_SLEEP    (30) //ms
+#define DC3231_THREAD_SLEEP     	(10000) //ms
+#define MPU6050_THREAD_SLEEP_GAME      	(30) //ms
+#define MPU6050_THREAD_SLEEP_PEDOMETER  (100) //ms
 
-#define I2C_DATA_BUFFER_MAX	(10)
+#define I2C_DATA_BUFFER_MAX	(10) 	//bytes
 
-#define ABS(x) (x < 0 ? -x : x)
+#define ABS(x) (x < 0 ? -x : x) 	//Absolute number
 
 
 struct temp_and_press temp_and_press;
@@ -305,14 +306,12 @@ static int ds3231_remove(struct i2c_client *client)
 int mpu6050_read(void *pv)
 {
 	int8_t total_vector;
-	uint16_t step_timer = 0xFFFF, sleep;
 	int8_t accel_delta_x;
 	int8_t accel_delta_y;
 
 
 	while (!kthread_should_stop()) {
 
-		sleep = MPU6050_THREAD_SLEEP;
 		mutex_lock(&i2c_read);
 		mpu6050.accel_x = (i2c_read_byte(mpu6050.client, MPU6050_ACCEL_XOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_ACCEL_XOUT_H+1) << 8);
 		mpu6050.accel_y = (i2c_read_byte(mpu6050.client, MPU6050_ACCEL_YOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_ACCEL_YOUT_H+1) << 8);
@@ -320,16 +319,12 @@ int mpu6050_read(void *pv)
 		mpu6050.gyro_x = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_XOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_XOUT_H+1) << 8);
 		mpu6050.gyro_y = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_YOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_YOUT_H+1) << 8);
 		mpu6050.gyro_z = (i2c_read_byte(mpu6050.client, MPU6050_GYRO_ZOUT_H) | i2c_read_byte(mpu6050.client, MPU6050_GYRO_ZOUT_H+1) << 8);
-		//pr_err("New x: %d y:%d z:%d\n", mpu6050.accel_x, mpu6050.accel_y, mpu6050.accel_z);
-		//pr_err("Default x: %d y:%d z:%d\n", mpu6050.accel_x_def, mpu6050.accel_y_def, mpu6050.accel_z_def);
 		mutex_unlock(&i2c_read);
 
 		/* Calculate values for game */
 		accel_delta_x = mpu6050.accel_x_def-mpu6050.accel_x;
 		accel_delta_y = mpu6050.accel_y_def-mpu6050.accel_y;
 
-		//if (ABS(game.accel_delta_x) > 2) game.x+=game.accel_delta_x;
-		//if (ABS(game.accel_delta_y) > 2) game.y-=game.accel_delta_y;
 
 		if ((ABS(accel_delta_x) > 4) && (game.dir_x == 0)) {	
 						game.dir_x = ABS(accel_delta_x)/accel_delta_x;
@@ -358,17 +353,13 @@ int mpu6050_read(void *pv)
 		mpu6050.vector[mpu6050.vector_num] = int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y * 											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
 
 		total_vector = (mpu6050.vector[!mpu6050.vector_num]-mpu6050.vector[mpu6050.vector_num]);
-
-		//pr_err ("Total vector %d\n",total_vector );
-		//if ( ABS(total_vector) > 6) pr_err ("Step\n");
-		if (total_vector > 10)	{
+		if (total_vector > 8)	{
 			pr_err("Step registered\n");
 			game.steps_count++;
 			mpu6050.vector[mpu6050.vector_num] = 0;
-			//sleep+=500;
 			}
 		mpu6050.vector_num =  !mpu6050.vector_num;
-		msleep(sleep);
+		msleep((my_button.mode == GAME ) ? MPU6050_THREAD_SLEEP_GAME : MPU6050_THREAD_SLEEP_PEDOMETER);
 	}
 return 0;
 }
