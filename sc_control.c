@@ -386,8 +386,12 @@ static void pedometer_view_callback(struct timer_list *t)
 static void game_view_callback(struct timer_list *t)
 {
 
-	if ((my_button.mode == GAME) && (!game.game_over)) {
-		st7735fb_game_display();
+	if ((my_button.mode == GAME))  {
+		if (!game.game_over)
+				st7735fb_game_display();
+		else if (my_button.state == 1)
+				show_game_view();
+
 		mod_timer(&game_view,
 			jiffies + msecs_to_jiffies(DISP_GAME_REFRESH_TIME));
 	} else {

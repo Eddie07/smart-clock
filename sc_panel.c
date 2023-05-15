@@ -463,6 +463,7 @@ void st7735fb_game_display(void)
 
 							st7735fb_draw_string("GAME OVER", 30, 50, &font[FONT8], 10, RED_COLOR);
 							game.game_over = 1;
+							my_button.state = 0;
 					}
 	for (i = game.len; i > 0; i--) {
 		game.tail_x[i] = game.tail_x[i-1];
