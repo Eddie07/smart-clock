@@ -52,6 +52,7 @@
 
 #define MAX_STRING_SIZE			(20)
 
+#define FAHR(x) (9*x/5+32) //calcualte Fahrenheit
 
 const char *wdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
 uint8_t blink_bmask, notif_blink_bmask;
@@ -402,7 +403,13 @@ void st7735fb_temp_and_press_display(void)
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
 
 	st7735fb_draw_string("Temperature:", 0, 20, &font[FONT16], 10, DISP_TEMP_COLOR);
-	sprintf(value, "%d,%d C", temp_and_press.temp/100, temp_and_press.temp%100);
+
+	/* Display temperature in C or in Farenheight  */
+	if (options.is_temp_celsius)
+		sprintf(value, "%d,%d C", temp_and_press.temp/100, temp_and_press.temp%100);
+	else
+		sprintf(value, "%d F", FAHR(temp_and_press.temp/100));
+
 	st7735fb_draw_string(value, 20, 35, &font[FONT24], 12, DISP_TEMP_COLOR);
 	st7735fb_draw_string("Pressure:", 0, 60, &font[FONT16], 10, DISP_PRESS_COLOR);
 	sprintf(value, "%d,%d hPa", temp_and_press.press/256/100, temp_and_press.press/256%100);
