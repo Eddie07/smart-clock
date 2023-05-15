@@ -98,8 +98,8 @@ struct temp_and_press {
 struct game {
 	int16_t x;
 	int16_t y;
-	uint16_t *tail_x;
-	uint16_t *tail_y;
+	uint16_t tail_x[1000];
+	uint16_t tail_y[1000];
 	size_t len;
 	uint16_t fruit_x;
 	uint16_t fruit_y;

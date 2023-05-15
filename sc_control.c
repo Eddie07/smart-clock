@@ -135,9 +135,6 @@ void show_game_view(void)
 {
 	pr_err("Display mode %d\n",  my_button.mode);
 	/* Display the first frame before timer */
-
-	game.tail_x = kcalloc(1000, sizeof(uint16_t), GFP_KERNEL);
-	game.tail_y = kcalloc(1000, sizeof(uint16_t), GFP_KERNEL);
 	game.len = 20;
 	game.is_fruit = 0;
 	game.x = 80;
@@ -394,13 +391,8 @@ static void game_view_callback(struct timer_list *t)
 
 		mod_timer(&game_view,
 			jiffies + msecs_to_jiffies(DISP_GAME_REFRESH_TIME));
-	} else {
-	if (game.tail_x != NULL)
-		kfree(game.tail_x);
-	if (game.tail_y != NULL)
-		kfree(game.tail_y);
+	} 
 
-	}
 }
 
 
@@ -434,11 +426,7 @@ void init_controls(void)
 
 void  deinit_controls(void)
 {
-	if (game.tail_x != NULL)
-		kfree(game.tail_x);
-	if (game.tail_y != NULL)
-		kfree(game.tail_y);
-
+	del_timer_sync(&alarm_trigger);
 	del_timer_sync(&game_view);
 	del_timer_sync(&pedometer_view);
 	del_timer_sync(&temp_and_press_view);
