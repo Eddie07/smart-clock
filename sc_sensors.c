@@ -24,7 +24,7 @@
 #define DC3231_DEVICE_NAME	"ds3231"
 #define MPU6050_DEVICE_NAME	"mpu6050"
 
-#define DC3231_THREAD_SLEEP	(10000) //ms
+#define BMP280_THREAD_SLEEP	(10000) //ms check temp and pressure values once in 10 sec
 #define MPU6050_THREAD_SLEEP_GAME	(30) //ms
 #define MPU6050_THREAD_SLEEP_PEDOMETER  (100) //ms
 
@@ -117,7 +117,7 @@ int bmp280_read_temp_and_press(void *pv)
 		var2 = ((int64_t)calib_data.P8 * p) >> 19;
 		temp_and_press.press = (uint32_t)((p + var1 + var2) >> 8) + ((int64_t)calib_data.P7 << 4);
 
-		msleep(DC3231_THREAD_SLEEP);
+		msleep(BMP280_THREAD_SLEEP);
 	}
 	return 0;
 }
@@ -162,13 +162,6 @@ static int bmp280_probe(struct i2c_client *client, const struct i2c_device_id *i
 }
 
 
-static int bmp280_remove(struct i2c_client *client)
-{
-	pr_err("%s: removing\n", BMP280_DEVICE_NAME);
-	return 0;
-};
-
-
 /*----------------------------------------------------------------------*/
 /* bmp280 part	END							*/
 /*----------------------------------------------------------------------*/
@@ -178,7 +171,7 @@ static int bmp280_remove(struct i2c_client *client)
 /* dc3231 part	START							*/
 /*----------------------------------------------------------------------*/
 
-static void writeRtcTimeAndAlarm_work(struct work_struct *work)
+static void dc3231_writeRtcTimeAndAlarm_work(struct work_struct *work)
 {
 	struct timespec64 curr_tm;
 	struct tm tm_now;
@@ -219,7 +212,7 @@ static void ds3231_readRtcTimeAndAlarm(void)
 	clock_and_alarm.alarm_sec = (rtc2val(data_buf[9])*3600+rtc2val(data_buf[8])*60);	//8=DS3231_REG_ALARM_MIN & 9=DS3231_REG_ALARM_HOUR
 }
 
-static void writeOptions_work(struct work_struct *work)
+static void dc3231_writeOptions_work(struct work_struct *work)
 {
 	/*convert struct options to byte and store to reg*/
 	uint8_t options_info;
@@ -228,8 +221,8 @@ static void writeOptions_work(struct work_struct *work)
 	i2c_write_byte(ds3231.client, DS3231_REG_OPTIONS, options_info);
 }
 
-DECLARE_WORK(writeRtcTimeAndAlarm, writeRtcTimeAndAlarm_work);
-DECLARE_WORK(writeOptions, writeOptions_work);
+DECLARE_WORK(dc3231_writeRtcTimeAndAlarm, dc3231_writeRtcTimeAndAlarm_work);
+DECLARE_WORK(dc3231_writeOptions, dc3231_writeOptions_work);
 
 static void ds3231_readOptions(void)
 {
@@ -242,13 +235,13 @@ static void ds3231_readOptions(void)
 
 void ds3231_writeOptions(void)
 {
-	schedule_work(&writeOptions);
+	schedule_work(&dc3231_writeOptions);
 }
 
 
 void ds3231_writeRtcTimeAndAlarm(void)
 {
-	schedule_work(&writeRtcTimeAndAlarm);
+	schedule_work(&dc3231_writeRtcTimeAndAlarm);
 }
 
 
@@ -282,13 +275,6 @@ static int ds3231_probe(struct i2c_client *client,
 	return 0;
 }
 
-
-static int ds3231_remove(struct i2c_client *client)
-{
-
-	pr_err("%s: removing\n", DC3231_DEVICE_NAME);
-	return 0;
-};
 
 /*----------------------------------------------------------------------*/
 /* dc3231 part	END							*/
@@ -402,12 +388,7 @@ static int mpu6050_probe(struct i2c_client *client,
 	return 0;
 };
 
-static int mpu6050_remove(struct i2c_client *client)
-{
 
-	pr_err("%s: removing\n", MPU6050_DEVICE_NAME);
-	return 0;
-};
 
 /*----------------------------------------------------------------------*/
 /* mpu6050 part	START							*/
@@ -430,7 +411,6 @@ static struct i2c_driver bmp280_driver = {
 	    .of_match_table = bmp280_of_match,
 	},
 	  .probe          = bmp280_probe,
-	  .remove         = bmp280_remove,
 };
 
 /* pre-register Device table for bmp280 END */
@@ -452,7 +432,6 @@ static struct i2c_driver ds3231_driver = {
 	    .of_match_table = ds3231_of_match,
 	},
 	   .probe          = ds3231_probe,
-	  .remove         = ds3231_remove,
 };
 
 /* pre-register Device table for dc3231 END */
@@ -473,7 +452,6 @@ static struct i2c_driver mpu6050_driver = {
 	    .of_match_table = mpu6050_of_match,
 	},
 	   .probe          = mpu6050_probe,
-	  .remove         = mpu6050_remove,
 };
 
 /* pre-register Device table for mpu6050 END */
@@ -497,9 +475,4 @@ void  sensors_unload(void)
 	i2c_del_driver(&mpu6050_driver);
 	pr_err("sensors unloaded\n");
 }
-
-
-
-
-
 
