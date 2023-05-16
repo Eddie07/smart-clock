@@ -195,14 +195,14 @@ static void writeRtcTimeAndAlarm_work(struct work_struct *work)
 	data_buf[5] = val2rtc(tm_now.tm_mon);		// DS3231_REG_MON
 	data_buf[6] = val2rtc(tm_now.tm_year);	// DS3231_REG_YEAR
 	data_buf[7] = 0;					// DS3231_REG_ALARM_SEC
-	data_buf[8] = val2rtc((clock.alarm_sec%3600)/60);	// DS3231_REG_ALARM_MIN
-	data_buf[9] = val2rtc(clock.alarm_sec/3600);	// DS3231_REG_ALARM_HOUR
+	data_buf[8] = val2rtc((clock_and_alarm.alarm_sec%3600)/60);	// DS3231_REG_ALARM_MIN
+	data_buf[9] = val2rtc(clock_and_alarm.alarm_sec/3600);	// DS3231_REG_ALARM_HOUR
 	i2c_write_data(ds3231.client, DS3231_REG_SEC, data_buf, 10);
 
 }
 
 
-static void ds3231_readRtcTimeAndAlarm(void) 
+static void ds3231_readRtcTimeAndAlarm(void)
 {
 
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
@@ -216,7 +216,7 @@ static void ds3231_readRtcTimeAndAlarm(void)
 	ds3231.mday = rtc2val(data_buf[4]);			//4=DS3231_REG_DAY
 	ds3231.mon = rtc2val(data_buf[5]);			//5=DS3231_REG_MON
 	ds3231.year = rtc2val(data_buf[6]);			//6=DS3231_REG_YEAR
-	clock.alarm_sec = (rtc2val(data_buf[9])*3600+rtc2val(data_buf[8])*60);	//8=DS3231_REG_ALARM_MIN & 9=DS3231_REG_ALARM_HOUR			   	
+	clock_and_alarm.alarm_sec = (rtc2val(data_buf[9])*3600+rtc2val(data_buf[8])*60);	//8=DS3231_REG_ALARM_MIN & 9=DS3231_REG_ALARM_HOUR
 }
 
 static void writeOptions_work(struct work_struct *work)
@@ -341,8 +341,8 @@ int mpu6050_read(void *pv)
 			game.x = 10;
 		if (game.y > (HEIGHT-1))
 			game.y = HEIGHT-1;
-		if (game.y < 10)
-			game.y = 10;
+		if (game.y < 20)
+			game.y = 20;
 
 		/* Detect steps -pedometer func */
 		mpu6050.vector[mpu6050.vector_num] = int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y *											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
@@ -353,7 +353,9 @@ int mpu6050_read(void *pv)
 			mpu6050.vector[mpu6050.vector_num] = 0;
 			}
 		mpu6050.vector_num =  !mpu6050.vector_num;
-		msleep((my_button.mode == GAME ) ? MPU6050_THREAD_SLEEP_GAME : MPU6050_THREAD_SLEEP_PEDOMETER);
+
+		/* Variate msleep time for sensor reading thread to sync with refresh rate for snake game or pedometer views */
+		msleep((my_button.view_mode == GAME) ? MPU6050_THREAD_SLEEP_GAME : MPU6050_THREAD_SLEEP_PEDOMETER);
 	}
 return 0;
 }

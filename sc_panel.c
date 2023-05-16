@@ -37,6 +37,7 @@
 
 #define DISP_CLOCK_COLOR		BLUE_COLOR
 #define DISP_ALARM_COLOR		BLUE_COLOR
+#define DISP_TIMER_COLOR		BLUE_COLOR
 #define DISP_NOTIF_COLOR		GREEN_COLOR
 #define DISP_TEMP_COLOR			BLUE_COLOR
 #define DISP_PRESS_COLOR		BLUE_COLOR
@@ -44,7 +45,8 @@
 #define DISP_OPTIONS_COLOR		BLUE_COLOR
 
 /*Define bmp header values */
-#define BMP_HEADER_IMAGE_START		0xa
+#define BMP_HEADER_IMAGE_START		0x0a
+#define BMP_HEADER_SIZE			0x0e
 #define BMP_HEADER_WIDTH		0x12
 #define BMP_HEADER_HEIGHT		0x16
 #define BMP_HEADER_BPP			0x1c
@@ -56,12 +58,11 @@
 
 
 const char *wdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-uint8_t blink_bmask, notif_blink_bmask;
-
+uint8_t blink_bmask, notif_blink_bmask, alarm_blink_bmask;
+static void st7735fb_update_display(void);
 static void st7735fb_draw_string(char *, uint16_t, uint16_t, const struct Bitmap *, uint8_t, uint16_t);
 static void draw_icon(uint8_t, uint16_t, uint16_t, uint16_t);
-static void st7735fb_notifications_overlay(void);
-void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled);
+static void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled);
 
 
 static void display_update_work(struct work_struct *);
@@ -165,14 +166,6 @@ static void display_update_work(struct work_struct *work)
 }
 
 
-static void st7735fb_update_display(void)
-{
-
-	/*add to notification overlay*/
-	st7735fb_notifications_overlay();
-
-	schedule_work(&update_diplay);
-}
 
 static int st7735fb_init_display(void)
 {
@@ -201,19 +194,24 @@ void st7735fb_clear_blink_bmask(void)
 {
 	blink_bmask = 0xFF;
 	notif_blink_bmask = 0xFF;
+	alarm_blink_bmask = 0xFF;
 }
 
 void st7735fb_options_display(void)
 {
 
-	switch (my_button.set_mode) {
-			case 1:	blink_bmask ^= 1 << 1;  // option clock 24hrs blinking
-				break;
-			case 2:	blink_bmask ^= 1 << 2;  // option alarm blinking
-				break;
-			case 3:	blink_bmask ^= 1 << 3;  // option celsius blinking
-				break;
-			default:blink_bmask = 0xFF;
+	switch (my_button.edit_mode) {
+	case 1:
+		blink_bmask ^= 1 << 1;  // option clock 24hrs blinking
+		break;
+	case 2:
+		blink_bmask ^= 1 << 2;  // option alarm blinking
+		break;
+	case 3:
+		blink_bmask ^= 1 << 3;  // option celsius blinking
+		break;
+	default:
+		blink_bmask = 0xFF;
 				}
 
 	/* clear screen */
@@ -242,12 +240,15 @@ void st7735fb_alarm_display(uint8_t alarm_hour, uint8_t alarm_min)
 	static char time[MAX_STRING_SIZE];
 
 
-	switch (my_button.set_mode) {
-			case 1:	blink_bmask ^= 1 << 1;  // min
-				break;
-			case 2: blink_bmask ^= 1 << 2;  // hour
-				break;
-			default: blink_bmask = 0xFF;
+	switch (my_button.edit_mode) {
+	case 1:
+		blink_bmask ^= 1 << 1;  // min
+		break;
+	case 2:
+		blink_bmask ^= 1 << 2;  // hour
+		break;
+	default:
+		blink_bmask = 0xFF;
 			}
 
 	/* clear screen */
@@ -473,17 +474,6 @@ void st7735fb_game_display(void)
 
 
 
-static void st7735fb_notifications_overlay(void)
-{
-
-	if (options.is_alarm_enabled)
-		draw_icon(0, 0, 0, DISP_NOTIF_COLOR);
-	if ((our_timer.nsec) && (my_button.mode != TIMER)) {
-		notif_blink_bmask ^= 1 << 1;
-		draw_icon(1, 25, 0, ((notif_blink_bmask >> 1) & 1) ? DISP_NOTIF_COLOR : 0);
-	}
-
-}
 
 static void draw_char(char letter, uint16_t x, uint16_t y, const struct Bitmap *font, uint16_t color)
 {
@@ -615,11 +605,45 @@ void st7735fb_draw_obj(uint16_t xs, uint16_t ys, uint16_t size)
 	uint16_t x = 0, y = 0;
 
 	for (x = 0; x < WIDTH; x++)
-			for (y = 0; y < HEIGHT; y++) {
-						if ((x >= xs) && (x <= xs+size) && (y >= ys) && (y <= ys+size))
-														vmem16[(y)*WIDTH+(x)] = BLUE_COLOR;
+		for (y = 0; y < HEIGHT; y++) {
+			if ((x >= xs) && (x <= xs+size) && (y >= ys) && (y <= ys+size))
+				vmem16[(y)*WIDTH+(x)] = BLUE_COLOR;
 			}
 
+}
+
+static void st7735fb_notifications_overlay(void)
+{
+
+	if ((options.is_alarm_enabled) && (my_button.view_mode != GAME))
+		draw_icon(0, 0, 0, DISP_NOTIF_COLOR);
+	if ((our_timer.nsec) && (my_button.view_mode != TIMER) && (my_button.view_mode != GAME)) {
+		notif_blink_bmask ^= 1 << 1;
+		draw_icon(1, 25, 0, ((notif_blink_bmask >> 1) & 1) ? DISP_NOTIF_COLOR : 0);
+	}
+
+}
+
+static void st7735fb_alarm_overlay(void)
+{
+
+	if ((clock_and_alarm.is_alarm) && (my_button.view_mode != ALARM)) {
+		alarm_blink_bmask ^= 1 << 1;
+		if  ((alarm_blink_bmask >> 1) & 1)
+			st7735fb_draw_string("ALARM!!!", 0, 50, &font[FONT32], 20, DISP_NOTIF_COLOR);
+	}
+
+}
+
+static void st7735fb_update_display(void)
+{
+
+	/*add notification overlay*/
+	st7735fb_notifications_overlay();
+	/*add  alarm overlay*/
+	st7735fb_alarm_overlay();
+
+	schedule_work(&update_diplay);
 }
 
 static int st7735fb_probe(struct spi_device *spi)

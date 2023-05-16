@@ -22,18 +22,17 @@
 #define BUTTON_2ND_LONGPRESS_INTERVAL 800
 
 
+static struct gpio button_gpio = { 17, GPIOF_DIR_IN,  "Switch button"};
+
 static uint8_t button_irq;
 static struct timer_list bDebounce_timer, bLongpress_timer;
 
-static unsigned long flags = 0, counter = 0, longpress_counter = 0;
+static unsigned long flags = 0, counter = 0, longpress_counter;
 static uint8_t is_debounce_timer;
-struct button my_button;
 
-
-
-static void switch_view(void ) 
+static void switch_view(void)
 {
-	my_button.mode++;
+	my_button.view_mode++;
 	my_button.state = 0;
 	st7735fb_blank_display();
 	switch (my_button.view_mode) {
@@ -88,7 +87,7 @@ static void button_longpress_timer(struct timer_list *t)
 	if ((longpress_counter == counter) && gpio_get_value(button_gpio.gpio)) {
 		if (my_button.is_longpress) {
 			my_button.state = 3;
-			if (!my_button.set_mode)
+			if (!my_button.edit_mode)
 				switch_view();
 		} else
 			my_button.state = 2;
@@ -173,14 +172,14 @@ int  gpio_button_init(void)
 		timer_setup(&bLongpress_timer, button_longpress_timer, 0);
 		is_debounce_timer = 0;
 		my_button.state = 0;
-		my_button.set_mode = 0;
+		my_button.edit_mode = 0;
 
 return 0;
 
 }
 
 
-void  gpio_button_deinit(void)	
+void  gpio_button_unload(void)
 {
 	pr_err("%s: device exit\n", DEVICE_NAME);
 	del_timer_sync(&bDebounce_timer);

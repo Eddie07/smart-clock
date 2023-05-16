@@ -23,9 +23,16 @@ static int is_open;
 
 static struct cdev smart_clock_cdev;
 static struct class *dev_class;
+struct options options;
+struct clock_timer our_timer;
 struct init_hw  init_hw;
 struct fs_buffer fs_buffer = { .buf = NULL };
+struct clock_and_alarm clock_and_alarm;
+struct temp_and_press temp_and_press;
+struct game game;
+struct button my_button;
 
+static struct file_operations smart_clock_fops;
 
 /* exporting device class for use with another project modules */
 EXPORT_SYMBOL_GPL(dev_class);
@@ -44,7 +51,7 @@ static int my_dev_event(struct device *dev, struct kobj_uevent_env *env)
 static int  __init smart_clock_main(void)
 {
 
-	  /* Allocating chardev */
+	 /* Allocating chardev */
 	if ((alloc_chrdev_region(&dev, 0, 1, DEVICE_NAME)) < 0) {
 		pr_err("%s: Cannot allocate major number\n", DEVICE_NAME);
 	goto dev_unreg;
@@ -109,10 +116,10 @@ return 0;
 
 
 hw_sensors_fail:
-	sensors_deinit();
+	sensors_unload();
 hw_panel_fail:
-	st7735fb_exit();
-	gpio_button_deinit();
+	st7735fb_unload();
+	gpio_button_unload();
 dev_remove:
 	device_destroy(dev_class, dev);
 class_del:
@@ -130,11 +137,12 @@ return -1;
 
 static void  __exit smart_clock_exit(void)
 {
-	kfree(fs_buffer.buf);
-	deinit_controls();
-	sensors_deinit();
-	gpio_button_deinit();
-	st7735fb_exit();
+	if (fs_buffer.buf = ! NULL)
+		kfree(fs_buffer.buf);
+	controls_unload();
+	sensors_unload();
+	gpio_button_unload();
+	st7735fb_unload();
 	device_destroy(dev_class, dev);
 	class_destroy(dev_class);
 	cdev_del(&smart_clock_cdev);
@@ -212,6 +220,7 @@ static struct file_operations smart_clock_fops = {
 	.open   = device_file_open,
 	.release  = device_file_release,
 };
+
 
 
 module_init(smart_clock_main);
