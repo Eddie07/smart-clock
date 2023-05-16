@@ -46,15 +46,7 @@ static struct timer_list digital_clock_view, options_view, alarm_view, temp_and_
  */
 void show_timer_view(void)
 {
-	uint32_t disp_timer;
-
-	pr_err("Display mode %d\n", my_button.mode);
-	if  (our_timer.nsec)
-		our_timer.nsec_current_ktime = ktime_get_real_ns()-our_timer.nsec_old_ktime+our_timer.nsec;
-	else
-		our_timer.nsec_current_ktime = ktime_get_real_ns();
-	hrtimer_start(&digital_timer_view, ms_to_ktime(DISP_TIMER_REFRESH_TIME_NS), HRTIMER_MODE_REL);
-
+	hrtimer_start(&digital_timer_view, ms_to_ktime(DISP_HR_TIMER_REFRESH_TIME), HRTIMER_MODE_REL);
 }
 
 void show_clock_view(void)

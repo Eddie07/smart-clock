@@ -359,12 +359,14 @@ void st7735fb_timer_display(void)
 {
 	static char timer[MAX_STRING_SIZE];
 
-	sprintf(timer, "%lld", NS_TO_MSEC(our_timer.nsec));
-
 	/* clear screen */
 	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
 
-	st7735fb_draw_string(timer, 0, 20, &font[FONT48], 20, BLUE_COLOR);
+	st7735fb_draw_string("Timer:", 0, 20, &font[FONT16], 10, DISP_TIMER_COLOR);
+
+	sprintf(timer, "%02d:%02d:%03d", (uint32_t)NS_TO_MSEC(our_timer.nsec)/1000/60, (uint32_t)NS_TO_MSEC(our_timer.nsec)/1000%60, (uint32_t)NS_TO_MSEC(our_timer.nsec)%1000);
+
+	st7735fb_draw_string(timer, 10, 50, &font[FONT32], 14, DISP_TIMER_COLOR);
 
 	st7735fb_update_display();
 }
