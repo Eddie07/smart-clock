@@ -27,7 +27,8 @@
 #define WIDTH		(160)
 #define HEIGHT		(128)
 
-/*set default GPIO value to avoid troubles. But later replace from DT*/
+/* Game */
+#define SNAKE_TAIL_MAX	(1000)
 
 
 
@@ -100,8 +101,8 @@ struct game {
 	int16_t y;
 	int8_t dir_x;
 	int8_t dir_y;
-	uint16_t tail_x[1000];
-	uint16_t tail_y[1000];
+	uint16_t tail_x[SNAKE_TAIL_MAX];
+	uint16_t tail_y[SNAKE_TAIL_MAX];
 	size_t len;
 	uint16_t fruit_x;
 	uint16_t fruit_y;

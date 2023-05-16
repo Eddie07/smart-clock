@@ -39,39 +39,11 @@ static struct hrtimer digital_timer_view;
 static struct timer_list digital_clock_view, options_view, alarm_view, temp_and_press_view, pedometer_view, game_view, alarm_trigger;
 
 
-
-/************test mutex***/
-/*int alarm_check(void *pv)
-{
-	struct timespec64 curr_tm;
-	struct tm tm_now;
-	uint64_t time_sec;
-
-
-
-    while (!kthread_should_stop()) {
-
-	ktime_get_real_ts64(&curr_tm);
-	time64_to_tm(curr_tm.tv_sec, 0, &tm_now);
-	//mutex_lock(&etx_mutex);
-       // etx_global_variable++;
-
-
-	time_sec=tm_now.tm_hour*SECS_PER_HOUR + tm_now.tm_min*SEC;
-	//pr_err ("%lld %d\n", time_sec, clock.alarm_sec);
-	if ((my_button.mode != ALARM) && (time_sec==clock.alarm_sec))
-		{	pr_info("Alarm working\n");
-			st7735fb_temp_and_press_display();
-		}
-	//mutex_unlock(&etx_mutex);
-	msleep(1000);
-    }
-    return 0;
-}
-
-/***********thread**********/
-
-
+/**
+ * show_timer_view() - timer view
+ *
+ * switches view to timer mode and runs HR timer
+ */
 void show_timer_view(void)
 {
 	uint32_t disp_timer;
@@ -178,6 +150,33 @@ static enum hrtimer_restart digital_timer_view_callback(struct hrtimer *timer)
 		return HRTIMER_NORESTART;
 		}
 }
+
+static void alarm_trigger_callback(struct timer_list *t)
+{
+	struct timespec64 curr_tm;
+	struct tm tm_now;
+	uint64_t time_sec;
+	uint16_t timer_delay = 0;
+
+	ktime_get_real_ts64(&curr_tm);
+	time64_to_tm(curr_tm.tv_sec, 0, &tm_now);
+
+	time_sec = tm_now.tm_hour*SECS_PER_HOUR + tm_now.tm_min*SEC;
+
+
+	if ((tm_now.tm_hour == clock_and_alarm.alarm_sec/3600) &&
+		(tm_now.tm_min == (clock_and_alarm.alarm_sec%3600)/60) && (!clock_and_alarm.is_alarm))
+		clock_and_alarm.is_alarm = 1;
+
+	/* Postprone next trigeer to 65 sec when alarm stopped to avoid notifications loop*/
+	if ((clock_and_alarm.is_alarm) && (my_button.state)) {
+		clock_and_alarm.is_alarm = 0;
+		timer_delay = 0xFFFF;
+	}
+	mod_timer(&alarm_trigger,
+			jiffies + msecs_to_jiffies(ALARM_TRIGGER_REFRESH_TIME+timer_delay));
+}
+
 
 
 static void digital_clock_view_callback(struct timer_list *t)
@@ -420,7 +419,12 @@ void init_controls(void)
 	/*setup view options mode refresh timer */
 	timer_setup(&options_view, options_view_callback, 0);
 
-	}
+	/*setup and run alarm clock trigger timer */
+	timer_setup(&alarm_trigger, alarm_trigger_callback, 0);
+	mod_timer(&alarm_trigger,
+			jiffies + msecs_to_jiffies(ALARM_TRIGGER_REFRESH_TIME));
+
+}
 
 
 void  controls_unload(void)
