@@ -599,7 +599,37 @@ err:
 	st7735fb_update_display();
 }
 
+int st7735fb_get_buff_display(void)
+{
+	int x, y, header;
+	//uint16_t *buf;
+
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+
+	fs_buffer.buf =  kzalloc(st7735fb.vmem_size, GFP_KERNEL);
+	fs_buffer.buf_len = st7735fb.vmem_size;
+
+	if (fs_buffer.buf == NULL) {
+		pr_err("%s: malloc for buffer failed", __func__);
+		return -ENOMEM;
+	}
+	/* Storing bmp header */
+	sprintf(fs_buffer.buf, "%s", "BM");
+	fs_buffer.buf[BMP_HEADER_WIDTH] = WIDTH;
+	fs_buffer.buf[BMP_HEADER_HEIGHT] = HEIGHT;
+	fs_buffer.buf[BMP_HEADER_IMAGE_START] = 0x42;
+	fs_buffer.buf[BMP_HEADER_BPP] = 0x10;  //16 bit color
+	fs_buffer.buf[BMP_HEADER_SIZE] = 0x28;
+	header = 0x42;
+	for (y = HEIGHT; y > 0; y--)
+		for (x = 0; x <  WIDTH; x++) {
+			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])&0xff);
+			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])>>8);
+		}
+	//memcpy(fs_buffer.buf, buf, fs_buffer.buf_len);
+	return 0;
 }
+
 
 void st7735fb_draw_obj(uint16_t xs, uint16_t ys, uint16_t size)
 {
