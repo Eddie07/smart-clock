@@ -697,6 +697,8 @@ static int st7735fb_probe(struct spi_device *spi)
 		dev_err(&spi->dev, "%s: SPI setup error %d\n",
 			__func__, status);
 		return status;
+	}
+
 	dev_err(&spi->dev, "SPI ok\n");
 
 	st7735fb.spi = spi;
@@ -742,9 +744,9 @@ static int st7735fb_probe(struct spi_device *spi)
 	return retval;
 
 alloc_fail:
-	if (spi_writebuf = !NULL)
+	if (spi_writebuf != NULL)
 		kfree(spi_writebuf);
-	if (vmem = !NULL)
+	if (vmem != NULL)
 		kfree(vmem);
 gpio_fail:
 	gpio_free(st7735fb.dc);
@@ -752,17 +754,6 @@ gpio_fail:
 	return retval;
 };
 
-int  st7735fb_remove(struct spi_device *spi)
-{
-	pr_err("%s: deregistering\n", DEVICE_NAME);
-	msleep(100);
-	kfree(st7735fb.screen_base);
-	kfree(st7735fb.spi_writebuf);
-	gpio_free(st7735fb.dc);
-	gpio_free(st7735fb.rst);
-	pr_err("%s: unloaded\n", DEVICE_NAME);
-	return 0;
-}
 
 static const struct of_device_id st7735fb_of_match_table[] = {
 	{
@@ -782,7 +773,6 @@ struct spi_driver st7735fb_driver = {
 		.of_match_table = st7735fb_of_match_table,
 	},
 	.probe  = st7735fb_probe,
-	.remove = st7735fb_remove,
 };
 
 
@@ -794,8 +784,14 @@ int st7735fb_init(void)
 
 void st7735fb_unload(void)
 {
-	pr_err("%s: device exit\n", DEVICE_NAME);
+	pr_err("%s: exiting\n", DEVICE_NAME);
 	spi_unregister_driver(&st7735fb_driver);
+	msleep(100);
+	kfree(st7735fb.screen_base);
+	kfree(st7735fb.spi_writebuf);
+	gpio_free(st7735fb.dc);
+	gpio_free(st7735fb.rst);
+	pr_err("%s: unloaded\n", DEVICE_NAME);
 
 }
 
