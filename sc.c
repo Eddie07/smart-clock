@@ -26,9 +26,6 @@ static struct class *dev_class;
 struct init_hw  init_hw;
 struct fs_buffer fs_buffer = { .buf = NULL };
 
-//unsigned char fs_buffer[BUFFER_MAX_SIZE] = {0};
-
-
 
 /* exporting device class for use with another project modules */
 EXPORT_SYMBOL_GPL(dev_class);
@@ -40,7 +37,7 @@ static int my_dev_event(struct device *dev, struct kobj_uevent_env *env)
 	return 0;
 }
 
-static struct file_operations smart_clock_fops;
+
 
  /* Driver init */
 
@@ -150,7 +147,7 @@ static void  __exit smart_clock_exit(void)
 static int device_file_open(struct inode *inode, struct file *file)
 {
 	if (is_open) {
-		pr_err("Can't open. devsysfs is busy");
+		pr_err("%s: Can't open. devsysfs is busy", DEVICE_NAME);
 		return -EBUSY;
 	}
 	is_open = 1;
@@ -168,9 +165,14 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 {
 	ssize_t ret;
 
-	if (*offset >= fs_buffer.buf_len) {
+	if (!*offset)
+		if (st7735fb_get_buff_display() < 0)
+			ret = 0;
+
+	if ((*offset >= fs_buffer.buf_len) || (fs_buffer.buf == NULL)) {
 		/* we have finished to read, return 0 */
-		ret  = 0;
+		kfree(fs_buffer.buf);
+		ret = 0;
 	} else {
 		/* fill the buffer, return the buffer size */
 		copy_to_user(buffer, fs_buffer.buf, fs_buffer.buf_len);
@@ -183,35 +185,22 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 static ssize_t device_file_write(struct file *filp, const char __user *buffer, size_t count, loff_t *offset)
 {
 
-	fs_buffer.buf_len = count; //store buffer size
-	//memset(fs_buffer, 0, BUFFER_MAX_SIZE); //clear buffer from old garbage
+	fs_buffer.buf_len = count;
 
-	/* check for write buffer overflow > 1024 */
-	//if (fs_buffer_size > BUFFER_MAX_SIZE)
-	//	fs_buffer_size = BUFFER_MAX_SIZE;
-
-
-	/* get value */
-
-	fs_buffer.buf = kzalloc(count + 1, GFP_ATOMIC);
+	fs_buffer.buf = kzalloc(count + 1, GFP_KERNEL);
 	if (fs_buffer.buf == NULL) {
-		pr_err("malloc failed");
+		pr_err("%s: malloc for buffer failed", __func__);
 		return -ENOMEM;
 	}
 	if (copy_from_user(fs_buffer.buf, buffer, fs_buffer.buf_len)) {
-		pr_err("sysfs write failed\n");
+		pr_err("%s: sysfs write failed\n", __func__);
 		return -EFAULT;
 	}
 
 
-	pr_err(" Driver write bytes %lld\n", fs_buffer.buf_len);
+	pr_err(" Driver write bytes %d\n", fs_buffer.buf_len);
 	st7735fb_draw_buff_display();
-	//if (!memcmp(fs_buffer, "clean", strlen("clean"))) st7735fb_blank_display();
-	//if (!memcmp(fs_buffer, "word", strlen("word"))) st7735fb_draw_string(word);
-	//if (!memcmp(fs_buffer, "rotate", strlen("rotate"))) st7735fb_rotate_display();
-	//if (leds_control(fs_buffer))
-	//	pr_err("%s: write blink delay failed\n", MODULE_NAME);
-
+	kfree(fs_buffer.buf);
 	return count;
 }
 
@@ -230,6 +219,6 @@ module_exit(smart_clock_exit);
 
 
 MODULE_LICENSE("GPL");
-MODULE_AUTHOR("Eddie07 <splissken2014@gmail.com>");
+MODULE_AUTHOR("Dmytro Volkov <splissken2014@gmail.com>");
 MODULE_DESCRIPTION("Custom GPIO's driver for RGB leds");
-MODULE_VERSION("0.11");
+MODULE_VERSION("0.3");

@@ -24,20 +24,19 @@
 #define DC3231_DEVICE_NAME	"ds3231"
 #define MPU6050_DEVICE_NAME	"mpu6050"
 
-#define DC3231_THREAD_SLEEP     	(10000) //ms
-#define MPU6050_THREAD_SLEEP_GAME      	(30) //ms
+#define DC3231_THREAD_SLEEP	(10000) //ms
+#define MPU6050_THREAD_SLEEP_GAME	(30) //ms
 #define MPU6050_THREAD_SLEEP_PEDOMETER  (100) //ms
 
-#define I2C_DATA_BUFFER_MAX	(10) 	//bytes
+#define I2C_DATA_BUFFER_MAX	(10)	//bytes
 
-#define ABS(x) (x < 0 ? -x : x) 	//Absolute number
+#define ABS(x) (x < 0 ? -x : x)	//Absolute number
 
 
-struct temp_and_press temp_and_press;
-struct game game;
 
 static struct mutex i2c_read;
 static struct task_struct *bmp280_read_thread, *mpu6050_read_thread;
+
 
 
 
@@ -48,15 +47,15 @@ static int i2c_write_data(struct i2c_client *client, uint8_t command, uint8_t *d
 
 static int i2c_read_data(struct i2c_client *client, uint8_t command, uint8_t *data, size_t size)
 {
-	return i2c_smbus_read_i2c_block_data (client, command, size, data);
+	return i2c_smbus_read_i2c_block_data(client, command, size, data);
 }
 
-static int i2c_read_byte(struct i2c_client *client, uint8_t command) 
+static int i2c_read_byte(struct i2c_client *client, uint8_t command)
 {
 	return i2c_smbus_read_byte_data(client, command);
 }
 
-static int i2c_write_byte(struct i2c_client *client, uint8_t command, uint8_t data) 
+static int i2c_write_byte(struct i2c_client *client, uint8_t command, uint8_t data)
 {
 	return i2c_smbus_write_byte_data(client, command, data);
 }
@@ -120,12 +119,10 @@ int bmp280_read_temp_and_press(void *pv)
 
 		msleep(DC3231_THREAD_SLEEP);
 	}
-return 0;
+	return 0;
 }
 
-
-static int bmp280_probe(struct i2c_client *client,
-			 const struct i2c_device_id *id)
+static int bmp280_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
 	int ret;
 
@@ -133,11 +130,11 @@ static int bmp280_probe(struct i2c_client *client,
 
 	/*reporting probe to init */
 	ret = i2c_read_byte(client, 0x00);
-	if (ret < 0)	{
-			pr_err("%s: probe failed\n", BMP280_DEVICE_NAME);
-			return -ENODEV;
-			}
-	else	{
+	if (ret < 0) {
+		pr_err("%s: probe failed\n", BMP280_DEVICE_NAME);
+		return -ENODEV;
+		}
+	else {
 		init_hw.bmp280_i2c_probed = 1;
 		pr_err("%s: probed\n", BMP280_DEVICE_NAME);
 		}
@@ -185,31 +182,31 @@ static void writeRtcTimeAndAlarm_work(struct work_struct *work)
 {
 	struct timespec64 curr_tm;
 	struct tm tm_now;
-	uint8_t alarm_hour, alarm_minute;
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
 
 	/* Store time and alarm values to RTC registers  */
 	ktime_get_real_ts64(&curr_tm);
 	time64_to_tm(curr_tm.tv_sec, 0, &tm_now);
-	data_buf[0] = val2rtc(tm_now.tm_sec); 		// DS3231_REG_SEC
-	data_buf[1] = val2rtc(tm_now.tm_min); 		// DS3231_REG_MIN
-	data_buf[2] = val2rtc(tm_now.tm_hour); 		// DS3231_REG_HOUR
-	data_buf[3] = val2rtc(tm_now.tm_wday); 		// DS3231_REG_WDAY
-	data_buf[4] = val2rtc(tm_now.tm_mday); 		// DS3231_REG_DAY
-	data_buf[5] = val2rtc(tm_now.tm_mon); 		// DS3231_REG_MON
-	data_buf[6] = val2rtc(tm_now.tm_year);    	// DS3231_REG_YEAR
+	data_buf[0] = val2rtc(tm_now.tm_sec);		// DS3231_REG_SEC
+	data_buf[1] = val2rtc(tm_now.tm_min);		// DS3231_REG_MIN
+	data_buf[2] = val2rtc(tm_now.tm_hour);		// DS3231_REG_HOUR
+	data_buf[3] = val2rtc(tm_now.tm_wday);		// DS3231_REG_WDAY
+	data_buf[4] = val2rtc(tm_now.tm_mday);		// DS3231_REG_DAY
+	data_buf[5] = val2rtc(tm_now.tm_mon);		// DS3231_REG_MON
+	data_buf[6] = val2rtc(tm_now.tm_year);	// DS3231_REG_YEAR
 	data_buf[7] = 0;					// DS3231_REG_ALARM_SEC
 	data_buf[8] = val2rtc((clock.alarm_sec%3600)/60);	// DS3231_REG_ALARM_MIN
 	data_buf[9] = val2rtc(clock.alarm_sec/3600);	// DS3231_REG_ALARM_HOUR
-	i2c_write_data (ds3231.client, DS3231_REG_SEC, data_buf, 10);
+	i2c_write_data(ds3231.client, DS3231_REG_SEC, data_buf, 10);
 
 }
 
 
 static void ds3231_readRtcTimeAndAlarm(void) 
 {
-	/* Read time and alarm values from RTC registers */
+
 	uint8_t data_buf[I2C_DATA_BUFFER_MAX];
+	/* Read time and alarm values from RTC registers */
 
 	i2c_read_data(ds3231.client, DS3231_REG_SEC, data_buf, 10);
 	ds3231.sec = rtc2val(data_buf[0]);			//0=DS3231_REG_SEC
@@ -249,7 +246,6 @@ void ds3231_writeOptions(void)
 }
 
 
-
 void ds3231_writeRtcTimeAndAlarm(void)
 {
 	schedule_work(&writeRtcTimeAndAlarm);
@@ -268,13 +264,12 @@ static int ds3231_probe(struct i2c_client *client,
 	/*reporting probe to init */
 	ret = i2c_read_byte(client, 0x00);
 	if (ret < 0)	{
-			pr_err("%s: probe failed\n", DC3231_DEVICE_NAME);
-			return -ENODEV;
-			}
-	else	{
-		init_hw.ds3231_i2c_probed = 1;
-		pr_err("%s: probed\n", DC3231_DEVICE_NAME);
-		}
+		pr_err("%s: probe failed\n", DC3231_DEVICE_NAME);
+		return -ENODEV;
+	}
+	init_hw.ds3231_i2c_probed = 1;
+	pr_err("%s: probed\n", DC3231_DEVICE_NAME);
+
 	ds3231.client = client;
 	ds3231_readRtcTimeAndAlarm();
 	curr_tm_set.tv_sec = mktime64(ds3231.year + 1900, ds3231.mon + 1, ds3231.mday,
@@ -326,15 +321,15 @@ int mpu6050_read(void *pv)
 		accel_delta_y = mpu6050.accel_y_def-mpu6050.accel_y;
 
 
-		if ((ABS(accel_delta_x) > 4) && (game.dir_x == 0)) {	
-						game.dir_x = ABS(accel_delta_x)/accel_delta_x;
-						game.dir_y = 0;
-						}
+		if ((ABS(accel_delta_x) > 4) && (game.dir_x == 0)) {
+			game.dir_x = ABS(accel_delta_x)/accel_delta_x;
+			game.dir_y = 0;
+		}
 
 		if ((ABS(accel_delta_y) > 4) && (game.dir_y == 0)) {
-						game.dir_y = ABS(accel_delta_y)/accel_delta_y;
-						game.dir_x = 0;
-						}
+			game.dir_y = ABS(accel_delta_y)/accel_delta_y;
+			game.dir_x = 0;
+		}
 
 		game.x += game.dir_x;
 		game.y -= game.dir_y;
@@ -349,12 +344,11 @@ int mpu6050_read(void *pv)
 		if (game.y < 10)
 			game.y = 10;
 
-		/* Detect steps */
-		mpu6050.vector[mpu6050.vector_num] = int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y * 											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
+		/* Detect steps -pedometer func */
+		mpu6050.vector[mpu6050.vector_num] = int_sqrt((mpu6050.accel_x * mpu6050.accel_y) + (mpu6050.accel_y *											mpu6050.accel_y) + (mpu6050.accel_z * mpu6050.accel_z));
 
 		total_vector = (mpu6050.vector[!mpu6050.vector_num]-mpu6050.vector[mpu6050.vector_num]);
 		if (total_vector > 8)	{
-			pr_err("Step registered\n");
 			game.steps_count++;
 			mpu6050.vector[mpu6050.vector_num] = 0;
 			}
@@ -374,13 +368,12 @@ static int mpu6050_probe(struct i2c_client *client,
 	/*reporting probe to init */
 	ret = i2c_read_byte(client, 0x00);
 	if (ret < 0)	{
-			pr_err("%s: probe failed\n", MPU6050_DEVICE_NAME);
-			return -ENODEV;
-			}
-	else	{
-		init_hw.mpu6050_i2c_probed = 1;
-		pr_err("%s: probed\n", MPU6050_DEVICE_NAME);
-		}
+		pr_err("%s: probe failed\n", MPU6050_DEVICE_NAME);
+		return -ENODEV;
+	}
+	init_hw.mpu6050_i2c_probed = 1;
+	pr_err("%s: probed\n", MPU6050_DEVICE_NAME);
+
 	mpu6050.client = client;
 
 	/* Disable sleep mode */
@@ -493,13 +486,14 @@ int  sensors_init(void)
 	return 0;
 }
 
-void  sensors_deinit(void)
+void  sensors_unload(void)
 {
 	kthread_stop(bmp280_read_thread);
 	kthread_stop(mpu6050_read_thread);
 	i2c_del_driver(&bmp280_driver);
 	i2c_del_driver(&ds3231_driver);
 	i2c_del_driver(&mpu6050_driver);
+	pr_err("sensors unloaded\n");
 }
 
 

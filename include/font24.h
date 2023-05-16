@@ -1,7 +1,7 @@
 
 
 
-uint8_t font24_table [] = {
+uint8_t font24_table[] = {
 
 	// @0 ' ' (17 pixels wide)
 	0x00, 0x00, 0x00, //

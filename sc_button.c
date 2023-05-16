@@ -36,38 +36,46 @@ static void switch_view(void )
 	my_button.mode++;
 	my_button.state = 0;
 	st7735fb_blank_display();
-	switch (my_button.mode) {
-		case CLOCK:		show_clock_view();
-					break;
-		case TIMER:		show_timer_view();
-					break;
-		case ALARM:		show_alarm_view();
-					break;
-		case TEMP_AND_PRESS:	show_temp_and_press_view();
-					break;
-		case PEDOMETER:		show_pedometer_view();
-					break;
-		case GAME:		show_game_view();
-					break;
-		case OPTIONS:		show_options_view();
-					break;
-		case END:		my_button.mode = 0;
-					switch_view();
-					break;
+	switch (my_button.view_mode) {
+	case CLOCK:
+		show_clock_view();
+		break;
+	case TIMER:
+		show_timer_view();
+		break;
+	case ALARM:
+		show_alarm_view();
+		break;
+	case TEMP_AND_PRESS:
+		show_temp_and_press_view();
+		break;
+	case PEDOMETER:
+		show_pedometer_view();
+		break;
+	case GAME:
+		show_game_view();
+		break;
+	case OPTIONS:
+		show_options_view();
+		break;
+	case DISP_MODES_END:
+		my_button.view_mode = 0;
+		switch_view();
+		break;
 	}
-
 
 }
 
 
 void button_workqueue_fn(struct work_struct *work)
 {
-	if (!my_button.is_longpress) mod_timer(&bDebounce_timer,
+	if (!my_button.is_longpress)
+		mod_timer(&bDebounce_timer,
 			jiffies + msecs_to_jiffies(BUTTON_DEBOUNCE_INTERVAL));
 	mod_timer(&bLongpress_timer,
-			jiffies + msecs_to_jiffies(BUTTON_LONGPRESS_INTERVAL));
+		jiffies + msecs_to_jiffies(BUTTON_LONGPRESS_INTERVAL));
 
-	longpress_counter = counter;		
+	longpress_counter = counter;
 		}
 
 
@@ -78,28 +86,28 @@ DECLARE_WORK(button_workqueue, button_workqueue_fn);
 static void button_longpress_timer(struct timer_list *t)
 {
 	if ((longpress_counter == counter) && gpio_get_value(button_gpio.gpio)) {
-		printk("button long press!!!! %lu\n", counter);
 		if (my_button.is_longpress) {
 			my_button.state = 3;
 			if (!my_button.set_mode)
 				switch_view();
-		} else 
-		my_button.state=2;
- 		my_button.is_longpress = 1;
-		mod_timer(&bLongpress_timer,
-			jiffies + msecs_to_jiffies(BUTTON_2ND_LONGPRESS_INTERVAL));
-	} else  my_button.is_longpress = 0;
+		} else
+			my_button.state = 2;
+
+	my_button.is_longpress = 1;
+	mod_timer(&bLongpress_timer,
+		jiffies + msecs_to_jiffies(BUTTON_2ND_LONGPRESS_INTERVAL));
+	} else
+		my_button.is_longpress = 0;
 
 }
 
 static void button_debounce_timer(struct timer_list *t)
 {
 
-	
-	if (!gpio_get_value(button_gpio.gpio) && (!my_button.is_longpress)) { 
-	        my_button.state = 1;
-		printk("button short press!!!! %lu\n", counter);
-	} else my_button.state = 0;
+	if (!gpio_get_value(button_gpio.gpio) && (!my_button.is_longpress))
+		my_button.state = 1;
+	else
+		my_button.state = 0;
 	is_debounce_timer = 0;
 }
 
@@ -130,8 +138,8 @@ int  gpio_button_init(void)
 		}
 
 	if (!gpio_is_valid(button_gpio.gpio)) {
-			pr_err("%s: gpio %d is not valid\n", DEVICE_NAME, button_gpio.gpio);
-			return -1;
+		pr_err("%s: gpio %d is not valid\n", DEVICE_NAME, button_gpio.gpio);
+		return -1;
 		}
 	/* GPIO's request*/
 	if (gpio_request_one(button_gpio.gpio, button_gpio.flags, button_gpio.label)) {
@@ -152,7 +160,7 @@ int  gpio_button_init(void)
 			}
 
 
-		if (request_irq( button_irq, button_press, IRQF_TRIGGER_RISING, TRIGGER_IRQ, DEVICE_NAME)) {
+		if (request_irq(button_irq, button_press, IRQF_TRIGGER_RISING, TRIGGER_IRQ, DEVICE_NAME)) {
 			pr_err("%s: register IRQ %d, error\n", DEVICE_NAME,
 					button_gpio.gpio);
 					free_irq(button_irq, DEVICE_NAME);

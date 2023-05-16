@@ -8,25 +8,24 @@
 
 /* Time registers */
 
-#define DS3231_REG_SEC    		0x00
-#define DS3231_REG_MIN    		0x01
-#define DS3231_REG_HOUR    		0x02
-#define DS3231_REG_WDAY    		0x03
-#define DS3231_REG_DAY    		0x04
-#define DS3231_REG_MON   		0x05
-#define DS3231_REG_YEAR    		0x06
+#define DS3231_REG_SEC		0x00
+#define DS3231_REG_MIN		0x01
+#define DS3231_REG_HOUR		0x02
+#define DS3231_REG_WDAY		0x03
+#define DS3231_REG_DAY		0x04
+#define DS3231_REG_MON		0x05
+#define DS3231_REG_YEAR		0x06
 
 /* Alarm registers */
 
-#define DS3231_REG_ALARM_SEC    	0x07
-#define DS3231_REG_ALARM_MIN    	0x08
-#define DS3231_REG_ALARM_HOUR   	0x09
+#define DS3231_REG_ALARM_SEC	0x07
+#define DS3231_REG_ALARM_MIN	0x08
+#define DS3231_REG_ALARM_HOUR	0x09
 
 /* Our options storage registers, since we dont have EEPROM we are using Alarm2 registers 0x0b & 0x0c  */
 /* 0x0b 1st bit=enable alarm; 2nd bit=enable clock am/pm; 3d bit=enables temperature shown in farenheits */
-  
-#define DS3231_REG_OPTIONS  		0x0b
-#define DS3231_REG_OPTION_UTC_ZONE   	0x0c
+
+#define DS3231_REG_OPTIONS		0x0b
 
 struct ds3231 {
 	struct i2c_client *client;

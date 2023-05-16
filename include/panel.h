@@ -1,10 +1,9 @@
 #ifndef __PANEL_H_INCLUDED
 #define __PANEL_H_INCLUDED
 
-#define WIDTH		160
-#define HEIGHT		128
+/* Screen params */
 #define BPP		16
-#define MEM_SIZE        WIDTH*HEIGHT*BPP/8;
+#define MEM_SIZE        (WIDTH*HEIGHT*BPP/8)
 
 
 /* ST7735 Commands */
@@ -50,7 +49,11 @@
 #define ST7735_MADCTL_ML 0x10
 #define ST7735_MADCTL_RGB 0x00
 
+/* Convert Nanoseconds to Milliseconds for timer view */
+#define NS_PER_MSEC (1000000L)
+#define NS_TO_MSEC(nsec) (div_s64(nsec, NS_PER_MSEC))
 
+/* Including fonts and icons used for display views */
 #include "font8.h"
 #include "font16.h"
 #include "font24.h"
@@ -59,38 +62,38 @@
 #include "icons.h"
 
 struct Bitmap {
-        uint8_t *table;
+	uint8_t *table;
 	uint8_t width;
 	uint8_t height;
-  };
+};
 
-struct Bitmap font[] = {
-				{ font8_table, 8, 8},
-				{ font16_table, 11, 16},
-				{ font24_table, 17, 24 },
-				{ font32_table, 32, 32 },
-				{ font48_table, 24, 48 },
+const struct Bitmap font[] = {
+	{ font8_table, 8, 8},
+	{ font16_table, 11, 16},
+	{ font24_table, 17, 24 },
+	{ font32_table, 27, 34 },
+	{ font48_table, 24, 48 },
 };
 
 enum fonts {
-FONT8 =0,
-FONT16,
-FONT24,
-FONT32,
-FONT48,
+	FONT8 = 0,
+	FONT16,
+	FONT24,
+	FONT32,
+	FONT48,
 };
 
 const struct Bitmap icons = { icons_table, 16, 16 };
 
 
 
-/* Init script function */
+/* Init display script function */
 struct st7735_function {
 	uint8_t cmd;
 	uint8_t data;
 };
 
-/* Init script commands */
+/* Init display script commands */
 enum st7735_cmd {
 	ST7735_START,
 	ST7735_END,
@@ -100,7 +103,7 @@ enum st7735_cmd {
 };
 
 
-struct st7735fb {
+static struct st7735fb {
 	struct spi_device *spi;
 	uint8_t *spi_writebuf;
 	size_t vmem_size;
@@ -110,7 +113,7 @@ struct st7735fb {
 } st7735fb;
 
 
-static struct st7735_function st7735_cfg[] = {
+const struct st7735_function st7735_cfg[] = {
 	{ ST7735_START, ST7735_START},
 	/* cfg script start */
 	{ ST7735_CMD, ST7735_SWRESET},
@@ -204,8 +207,6 @@ static struct st7735_function st7735_cfg[] = {
 	{ ST7735_DATA, 0x10},
 	{ ST7735_CMD, ST7735_NORON},
 	{ ST7735_DELAY, 10},
-
-
 	/* powering on the display */
 	{ ST7735_CMD, ST7735_DISPON},
 	/* cfg script end */

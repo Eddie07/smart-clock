@@ -9,9 +9,8 @@ smart_clock-m := \
 	sc_panel.o \
 	sc_sensors.o
 
-# Flags for the compiler to disable some not important warnings 
+# Flags for the compiler to disable some not important warnings
 EXTRA_CFLAGS += \
-	-Wno-unused-variable \
 	-Wno-unused-result \
 	-Wno-sequence-point
 
@@ -26,7 +25,7 @@ CROSS_COMPILE ?= arm-linux-gnueabihf-
 
 ifneq (, $(wildcard $(KDIR)scripts/dtc/dtc))
 
-# Assign dtc kernel path 
+# Assign dtc kernel path
 DTC  = $(KDIR)scripts/dtc/dtc
 
 # Else check if dtc is installed in system PATH
@@ -34,7 +33,7 @@ else ifeq (, $(shell which dtc))
 $(error  No dtc bin found, consider doing apt-get install dtc or comiling kernel before)
 else
 
-# Assign dtc system path 
+# Assign dtc system path
 DTC  =$(shell which dtc)
 endif
 
@@ -47,7 +46,7 @@ clean:
 dtbs:
 	$(DTC) -I dts -O dtb smart_clock.dts -o smart_clock.dtbo
 
-help:	
+help:
 	@echo "Flags and variables:"
 	@echo " 'KDIR'			path to kernel"
 	@echo "			By Default ../../kernel_old/linux/"

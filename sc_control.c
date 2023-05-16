@@ -146,8 +146,6 @@ void show_game_view(void)
 }
 
 
-
-
 static enum hrtimer_restart digital_timer_view_callback(struct hrtimer *timer)
 
 {
@@ -399,27 +397,27 @@ static void game_view_callback(struct timer_list *t)
 void init_controls(void)
 {
 
-		/*setup display clock mode refresh timer */
-		timer_setup(&digital_clock_view, digital_clock_view_callback, 0);
+	/*setup view clock mode refresh timer */
+	timer_setup(&digital_clock_view, digital_clock_view_callback, 0);
 
-		/*setup display HR timer for clock timer refresh mode */
-		hrtimer_init(&digital_timer_view, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-		digital_timer_view.function = &digital_timer_view_callback;
+	/*setup view HR timer for clock timer refresh mode */
+	hrtimer_init(&digital_timer_view, CLOCK_MONOTONIC, HRTIMER_MODE_REL);
+	digital_timer_view.function = &digital_timer_view_callback;
 
-		/*setup alarm view mode refresh timer */
-		timer_setup(&alarm_view, alarm_view_callback, 0);
+	/*setup alarm view mode refresh timer */
+	timer_setup(&alarm_view, alarm_view_callback, 0);
 
-		/*setup temperature and pressure view mode refresh timer */
-		timer_setup(&temp_and_press_view, temp_and_press_view_callback, 0);
+	/*setup temperature and pressure view mode refresh timer */
+	timer_setup(&temp_and_press_view, temp_and_press_view_callback, 0);
 
-		/*setup temperature and pressure view mode refresh timer */
-		timer_setup(&pedometer_view, pedometer_view_callback, 0);
+	/*setup temperature and pressure view mode refresh timer */
+	timer_setup(&pedometer_view, pedometer_view_callback, 0);
 
-		/*setup game view mode refresh timer */
-		timer_setup(&game_view, game_view_callback, 0);
+	/*setup game view mode refresh timer */
+	timer_setup(&game_view, game_view_callback, 0);
 
-		/*setup display options mode refresh timer */
-		timer_setup(&options_view, options_view_callback, 0);
+	/*setup view options mode refresh timer */
+	timer_setup(&options_view, options_view_callback, 0);
 
 	}
 

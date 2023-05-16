@@ -52,22 +52,19 @@
 
 
 struct BMP280CalibrationData {
-  uint16_t T1;
-  int16_t T2;
-  int16_t T3;
-  uint16_t P1;
-  int16_t P2;
-  int16_t P3;
-  int16_t P4;
-  int16_t P5;
-  int16_t P6;
-  int16_t P7;
-  int16_t P8;
-  int16_t P9;
+	uint16_t T1;
+	int16_t T2;
+	int16_t T3;
+	uint16_t P1;
+	int16_t P2;
+	int16_t P3;
+	int16_t P4;
+	int16_t P5;
+	int16_t P6;
+	int16_t P7;
+	int16_t P8;
+	int16_t P9;
 } calib_data;
 
-//struct bmp280 {
-//	struct	 i2c_client *client;
-//} bmp280;
 struct	i2c_client *bmp280_i2c;
 #endif
