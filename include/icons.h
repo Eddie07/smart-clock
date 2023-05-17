@@ -1,9 +1,10 @@
-
+#ifndef __ICONS_H_INCLUDED
+#define __ICONS_H_INCLUDED
 /*icons 16x16*/
 
-uint8_t icons_table[] = {
+static uint8_t icons_table[] = {
 
-	/* alarm icon */
+	/* alarm icon =0 */
 	0x00, 0x00,
 	0x00, 0x00,
 	0x20, 0x20,
@@ -21,7 +22,7 @@ uint8_t icons_table[] = {
 	0x00, 0x00,
 	0x00, 0x00,
 
-	/* timer icon */
+	/* timer icon  =1 */
 	0x00, 0x00,
 	0x00, 0x00,
 	0x00, 0x00,
@@ -39,7 +40,7 @@ uint8_t icons_table[] = {
 	0x00, 0x00,
 	0x00, 0x00,
 
-	/* unchecked state icon */
+	/* unchecked state icon =2 */
 	0x7f, 0xfe,
 	0xff, 0xff,
 	0xe0, 0x07,
@@ -57,7 +58,7 @@ uint8_t icons_table[] = {
 	0xff, 0xff,
 	0x7f, 0xfe,
 
-	/* checked state icon */
+	/* checked state icon =3 */
 	0x7f, 0xfe,
 	0xff, 0xff,
 	0xe0, 0x07,
@@ -146,7 +147,7 @@ uint8_t icons_table[] = {
 	0x00, 0x00,
 	0x00, 0x00,
 
-	/* apple =8 */
+	/* fruit =8 */
 	0x00, 0x00,
 	0x00, 0x00,
 	0x00, 0x00,
@@ -183,4 +184,5 @@ uint8_t icons_table[] = {
 	0x00, 0x00,
 };
 
+#endif
 

@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ *
+ * bmp280 sensor driver header
+ *
+ *
+ * Dmytro Volkov <splissken2014@gmail.com>
+ *
+ */
 
 #ifndef __BMP280_H__
 #define __BMP280_H__

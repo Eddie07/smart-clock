@@ -1,6 +1,7 @@
+#ifndef __FONT16_H_INCLUDED
+#define __FONT16_H_INCLUDED
 
-
-uint8_t font16_table[] = {
+static uint8_t font16_table[] = {
 
 	// @0 ' ' (11 pixels wide)
 	0x00, 0x00, //
@@ -1713,4 +1714,4 @@ uint8_t font16_table[] = {
 	0x00, 0x00, //
 };
 
-
+#endif

@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * to be filled
+ * Module library: sc_button
+ * Description: GPIO button controls for the module
+ * Module: smart-clock
  *
- * Dmytro Volkov <splissken2014@gmail.com>
+ * Copyright (C) 2023 Dmytro Volkov <splissken2014@gmail.com>
  *
  */
 
@@ -21,20 +23,45 @@
 #define BUTTON_LONGPRESS_INTERVAL 500
 #define BUTTON_2ND_LONGPRESS_INTERVAL 800
 
+/**
+ * init GPIO button with values to avoid troubles. But later replace from DT
+ *
+ * struct gpio {
+ *	unsigned	gpio;
+ *	unsigned long	flags;
+ *	const char	*label;
+ * };
+ */
 
 static struct gpio button_gpio = { 17, GPIOF_DIR_IN,  "Switch button"};
 
+/* IRQ number will be assigned by request_irq for GPIO button press events */
 static uint8_t button_irq;
+
+/* flags: to store IRQ flags, counter: and longpress_counter: for long press false detection */
+static unsigned long flags = 0, counter = 0, longpress_counter;
+
+/* Timers will be used for press debounce and long press detections */
 static struct timer_list bDebounce_timer, bLongpress_timer;
 
-static unsigned long flags = 0, counter = 0, longpress_counter;
+/* Will be true, while debounce timer running */
 static uint8_t is_debounce_timer;
 
+
+/**
+ * switch_view() - the main view switch by @my_button.view_mode value
+ *
+ * switches view to clock mode and runs timer
+ */
 static void switch_view(void)
 {
 	my_button.view_mode++;
 	my_button.state = 0;
-	st7735fb_blank_display();
+
+	/* Erase vmem before switching the view */
+	st7735fb_blank_vmem();
+	
+	/* Switch view */
 	switch (my_button.view_mode) {
 	case CLOCK:
 		show_clock_view();
@@ -65,7 +92,11 @@ static void switch_view(void)
 
 }
 
-
+/**
+ * button_workqueue_fn() - workqueue started after button interrrupt triggered
+ *
+ * starts debounce and long press timers
+ */
 void button_workqueue_fn(struct work_struct *work)
 {
 	if (!my_button.is_longpress)
@@ -81,7 +112,12 @@ void button_workqueue_fn(struct work_struct *work)
 DECLARE_WORK(button_workqueue, button_workqueue_fn);
 
 
-
+/**
+ * button_longpress_timer() - longpress detection timer
+ *
+ * there are two states of long press @my_button.state =2 and @my_button.state=3
+ * following will detect it.
+ */
 static void button_longpress_timer(struct timer_list *t)
 {
 	if ((longpress_counter == counter) && gpio_get_value(button_gpio.gpio)) {
@@ -100,6 +136,10 @@ static void button_longpress_timer(struct timer_list *t)
 
 }
 
+/**
+ * button_debounce_timer() - shot press/debounce timer
+ *
+ */
 static void button_debounce_timer(struct timer_list *t)
 {
 
@@ -110,6 +150,11 @@ static void button_debounce_timer(struct timer_list *t)
 	is_debounce_timer = 0;
 }
 
+/**
+ * irqreturn_t button_press() - button press interrupt trigger.
+ *
+ * schedules @button_workqueue_fn() workqueue
+ */
 static irqreturn_t button_press(int irq, void *data)
 {
 	local_irq_save(flags);
@@ -125,7 +170,10 @@ static irqreturn_t button_press(int irq, void *data)
 }
 
 
-
+/**
+ * gpio_button_init() - init module library from main.
+ *
+ */
 int  gpio_button_init(void)
 {
 	struct device_node *np;
@@ -178,7 +226,10 @@ return 0;
 
 }
 
-
+/**
+ *  gpio_button_unload() - exit module library from main.
+ *
+ */
 void  gpio_button_unload(void)
 {
 	pr_err("%s: device exit\n", DEVICE_NAME);

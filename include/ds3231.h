@@ -1,3 +1,11 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ *
+ * ds3231 rtc driver header
+ *
+ *
+ * Dmytro Volkov <splissken2014@gmail.com>
+ *
+ */
 
 #ifndef __DS3231_H__
 #define __DS3231_H__

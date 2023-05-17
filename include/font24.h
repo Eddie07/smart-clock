@@ -1,7 +1,8 @@
+#ifndef __FONT24_H_INCLUDED
+#define __FONT24_H_INCLUDED
 
 
-
-uint8_t font24_table[] = {
+static uint8_t font24_table[] = {
 
 	// @0 ' ' (17 pixels wide)
 	0x00, 0x00, 0x00, //
@@ -2473,4 +2474,4 @@ uint8_t font24_table[] = {
 	0x00, 0x00, 0x00, //
 	0x00, 0x00, 0x00, //
 };
-
+#endif

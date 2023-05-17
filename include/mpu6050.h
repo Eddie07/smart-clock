@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0-only
  *
- * Leds GPIO's driver for RGB leds header
+ * mpu6050 sensor driver header
  *
  *
  * Dmytro Volkov <splissken2014@gmail.com>

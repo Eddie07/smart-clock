@@ -1,9 +1,14 @@
+/* SPDX-License-Identifier: GPL-2.0-only
+ *
+ * st7735 display driver header
+ *
+ *
+ * Dmytro Volkov <splissken2014@gmail.com>
+ *
+ */
+
 #ifndef __PANEL_H_INCLUDED
 #define __PANEL_H_INCLUDED
-
-/* Screen params */
-#define BPP		16
-#define MEM_SIZE        (WIDTH*HEIGHT*BPP/8)
 
 
 /* ST7735 Commands */
@@ -48,42 +53,6 @@
 #define ST7735_MADCTL_MV 0x20
 #define ST7735_MADCTL_ML 0x10
 #define ST7735_MADCTL_RGB 0x00
-
-/* Convert Nanoseconds to Milliseconds for timer view */
-#define NS_PER_MSEC (1000000L)
-#define NS_TO_MSEC(nsec) (div_s64(nsec, NS_PER_MSEC))
-
-/* Including fonts and icons used for display views */
-#include "font8.h"
-#include "font16.h"
-#include "font24.h"
-#include "font32.h"
-#include "font48.h"
-#include "icons.h"
-
-struct Bitmap {
-	uint8_t *table;
-	uint8_t width;
-	uint8_t height;
-};
-
-const struct Bitmap font[] = {
-	{ font8_table, 8, 8},
-	{ font16_table, 11, 16},
-	{ font24_table, 17, 24 },
-	{ font32_table, 27, 34 },
-	{ font48_table, 24, 48 },
-};
-
-enum fonts {
-	FONT8 = 0,
-	FONT16,
-	FONT24,
-	FONT32,
-	FONT48,
-};
-
-const struct Bitmap icons = { icons_table, 16, 16 };
 
 
 

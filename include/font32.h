@@ -1,5 +1,7 @@
+#ifndef __FONT32_H_INCLUDED
+#define __FONT32_H_INCLUDED
 
-uint8_t font32_table[] = {
+static uint8_t font32_table[] = {
     // ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙
     // ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙
     // ∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙∙
@@ -6471,5 +6473,5 @@ uint8_t font32_table[] = {
     0x00, 0x00, 0x00, 0x1f,
 };
 
-
+#endif
 

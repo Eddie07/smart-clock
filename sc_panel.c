@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-only
 /*
- * to be filled
+ * Module library: sc_panel
+ * Description: st7735fb display driver and display functions for the module
+ * Module: smart-clock
  *
- * Dmytro Volkov <splissken2014@gmail.com>
+ * Copyright (C) 2023 Dmytro Volkov <splissken2014@gmail.com>
  *
  */
 
@@ -20,63 +22,272 @@
 
 #include "include/project1.h"
 #include "include/panel.h"
+#include "include/draw.h"
+
+/* Screen params */
+#define BPP		(16)
+#define MEM_SIZE	(WIDTH*HEIGHT*BPP/8)
+#define DEVICE_NAME	"st7735fb"
 
 
-#define DEVICE_NAME		"st7735fb"
-
-
-/* Define 16bit colors for st7735fb panel */
-
-#define  WHITE_COLOR	0xffff	//white
-#define  RED_COLOR	0xf800	//red
-#define  GREEN_COLOR	0x07e0	//green
-#define  BLUE_COLOR	0x00ff	//blue
-#define  YELLOW_COLOR	0xffe0	//yellow
-
-/*Define colors for display modes */
-
-#define DISP_CLOCK_COLOR		BLUE_COLOR
-#define DISP_ALARM_COLOR		BLUE_COLOR
-#define DISP_TIMER_COLOR		BLUE_COLOR
-#define DISP_NOTIF_COLOR		GREEN_COLOR
-#define DISP_TEMP_COLOR			BLUE_COLOR
-#define DISP_PRESS_COLOR		BLUE_COLOR
-#define DISP_PEDOMETER_COLOR		BLUE_COLOR
-#define DISP_OPTIONS_COLOR		BLUE_COLOR
-
-/*Define bmp header values */
-#define BMP_HEADER_IMAGE_START		0x0a
+/* bmp header offsets */
+#define BMP_HEADER_IMAGE_START	0x0a
 #define BMP_HEADER_SIZE			0x0e
 #define BMP_HEADER_WIDTH		0x12
 #define BMP_HEADER_HEIGHT		0x16
 #define BMP_HEADER_BPP			0x1c
 
 
-#define MAX_STRING_SIZE			(20)
-
-#define FAHR(x) (9*x/5+32) //calcualte Fahrenheit
-
-
-const char *wdays[] = {"Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"};
-uint8_t blink_bmask, notif_blink_bmask, alarm_blink_bmask;
-static void st7735fb_update_display(void);
-static void st7735fb_draw_string(char *, uint16_t, uint16_t, const struct Bitmap *, uint8_t, uint16_t);
-static void draw_icon(uint8_t, uint16_t, uint16_t, uint16_t);
-static void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled);
-
-
+uint8_t timer_blink_bmask, alarm_blink_bmask;
 static void display_update_work(struct work_struct *);
 
 
-DECLARE_WORK(update_diplay, display_update_work);
-
 /*-----------------------------------------------------------*/
-/*	st7735 driver functions	BEGIN			     */
+/*	st7735 driver functions	START			     */
 /*-----------------------------------------------------------*/
 
+
+/**
+ * external draw_icon() - drawing icon to vmem
+ * @icon: enum icon from icons.h
+ * @x: coordinate by x-axis
+ * @y: coordinate by y-axis
+ * @color: enum color displayed
+ */
+void draw_icon(uint8_t icon, uint16_t x, uint16_t y, uint16_t color)
+{
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+	uint8_t xc, yc;
+
+	uint16_t icon_offset = icon * icons.height *
+	 (icons.width / 8 + (icons.width % 8 ? 1 : 0));
+
+	uint8_t *ptr = &icons.table[icon_offset];
+
+	for (yc = 0; yc < icons.height; yc++) {
+		for (xc = 0; xc < icons.width; xc++) {
+			if (*ptr & (0x80 >> (xc % 8)))
+				vmem16[(y+yc)*WIDTH+(x+xc)] = color;
+			if (xc % 8 == 7)
+				ptr++;
+		}
+		if (icons.width % 8 != 0)
+			ptr++;
+	}
+}
+
+/**
+ * extern st7735fb_draw_rectangle() - drawing rectangle or line to vmem
+ * @xs: start coordinate by x-axis
+ * @ys: start coordinate by y-axis
+ * @xe: end coordinate by x-axis
+ * @ye: end coordinate by y-axis
+ * @color: enum color displayed
+ * @filled: if true will be filled
+ */
+void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled)
+{
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+	uint16_t x = 0, y = 0;
+
+	for (x = 0; x < WIDTH; x++)
+		for (y = 0; y < HEIGHT; y++) {
+			if ((((x == xs) || (x == xe)) && (y >= ys) && (y <= ye)) ||
+				 (((y == ys) || (y == ye)) && (x >= xs) && (x <= xe)))
+				vmem16[(y)*WIDTH+(x)] = color;
+			if (filled)
+				if (((x >= xs) && (x <= xe)) && ((y >= ys) && (y <= ye)))
+					vmem16[(y)*WIDTH+(x)] = color;
+			}
+}
+
+
+/**
+ * external st7735fb_draw_string() - drawing string to vmem
+ * @x: start coordinate by x-axis
+ * @y: start coordinate by y-axis
+ * @font: bitmap font
+ * @x_offset: x bias between chars in text
+ * @color: enum color displayed
+ */
+void st7735fb_draw_string(char *text, uint16_t x, uint16_t y, struct Bitmap *font, uint8_t x_offset, uint16_t color)
+{
+	uint8_t char_x, char_y, i = 0;
+
+	/* attach vmem */
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+
+	while (text[i] != 0) {
+		/* find char offset */
+		uint16_t char_offset = (text[i] - ' ') * font->height *
+		 (font->width / 8 + (font->width % 8 ? 1 : 0));
+		uint8_t *ptr = &font->table[char_offset];
+		/* get display char */
+		for (char_y = 0; char_y < font->height; char_y++) {
+			for (char_x = 0; char_x < font->width; char_x++) {
+				if (*ptr & (0x80 >> (char_x % 8)))
+					/* write vmem */
+					vmem16[(y+char_y)*WIDTH+(x+char_x)] = color;
+				if (char_x % 8 == 7)
+					ptr++;
+			}
+			if (font->width % 8 != 0)
+				ptr++;
+		}
+		x += x_offset;
+		i++;
+	}
+}
+
+/**
+ * st7735fb_blank_vmem() - erase display vmem
+ *
+ * external, used when to erase vmem
+ */
+void st7735fb_blank_vmem(void)
+{
+	memset(st7735fb.screen_base,  0, st7735fb.vmem_size);
+}
+
+
+/**
+ * external int st7735fb_send_buff_display() - display bmp file from device sysfs
+ *
+ * returns 0 on success
+ *
+ */
+int st7735fb_send_buff_display(void)
+{
+	uint16_t y, x, xs = 0, ys = 0, bmp_size_x, bmp_size_y, header;
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+
+	/* Clear display buffer */
+	st7735fb_blank_vmem();
+	/* Read bmp header and exit if size is bigger than our screen */
+	bmp_size_x = fs_buffer.buf[BMP_HEADER_WIDTH]; //
+	bmp_size_y = fs_buffer.buf[BMP_HEADER_HEIGHT];
+	header = fs_buffer.buf[BMP_HEADER_IMAGE_START]+1;
+	if ((bmp_size_x > WIDTH) || (bmp_size_y > HEIGHT)) {
+		st7735fb_draw_string("Not supported size", 5, 50, &font[FONT16], 8, RED_COLOR);
+		return 1;
+	}
+	/* Re-Center image if its smaller than screen size */
+	if (bmp_size_x < WIDTH)
+		xs = (WIDTH-bmp_size_x)/2;
+	if (bmp_size_y < HEIGHT)
+		ys = (HEIGHT-bmp_size_y)/2;
+
+	while (y < bmp_size_y) {
+		while (x < bmp_size_x) {
+			/* if bmp is 16 bit color use 2 bytes color pallete */
+			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x10)
+				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 8) |
+								(fs_buffer.buf[header++]);
+			/* if bmp is 24 bit color use 3 bytes color pallete */
+			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x18)
+				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 16) |
+								(fs_buffer.buf[header++] << 8) |
+								(fs_buffer.buf[header++]);
+			/* if bmp is 32 bit color use 4 bytes color pallete */
+			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x20)
+				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 24) |
+								(fs_buffer.buf[header++] << 16) |
+								(fs_buffer.buf[header++] << 8) |
+								(fs_buffer.buf[header++]);
+		x++;
+		}
+		x = 0;
+		y++;
+	}
+
+	return 0;
+}
+
+/**
+ * st7735fb_draw_buff_display() - reads display memory and copys to buffer in bmp format
+ *
+ * external, called from @device_read_write()
+ *
+ */
+int st7735fb_get_buff_display(void)
+{
+	int x, y, header;
+
+	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
+
+	fs_buffer.buf =  kzalloc(st7735fb.vmem_size, GFP_KERNEL);
+	fs_buffer.buf_len = st7735fb.vmem_size;
+
+	if (fs_buffer.buf == NULL) {
+		pr_err("%s: malloc for buffer failed", __func__);
+		return -ENOMEM;
+	}
+	/* Storing bmp header */
+	sprintf(fs_buffer.buf, "%s", "BM");
+	fs_buffer.buf[BMP_HEADER_WIDTH] = WIDTH;
+	fs_buffer.buf[BMP_HEADER_HEIGHT] = HEIGHT;
+	fs_buffer.buf[BMP_HEADER_IMAGE_START] = 0x42;
+	fs_buffer.buf[BMP_HEADER_BPP] = 0x10;  //16 bit color
+	fs_buffer.buf[BMP_HEADER_SIZE] = 0x28;
+	header = 0x42;
+	for (y = HEIGHT; y > 0; y--)
+		for (x = 0; x <  WIDTH; x++) {
+			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])&0xff);
+			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])>>8);
+		}
+	return 0;
+}
+
+/**
+ * st7735fb_notifications_overlay() - add notifications to display view
+ *
+ * called in @st7735fb_update_display to add actual alarm & timer notifiations to screen view
+ *
+ */
+static void st7735fb_notifications_overlay(void)
+{
+	if ((options.is_alarm_enabled) && (my_button.view_mode != GAME))
+		draw_icon(0, 0, 0, DISP_NOTIF_COLOR);
+	if ((our_timer.nsec) && (my_button.view_mode != TIMER) && (my_button.view_mode != GAME)) {
+		timer_blink_bmask ^= 1 << 1;
+		draw_icon(1, 25, 0, ((timer_blink_bmask >> 1) & 1) ? DISP_NOTIF_COLOR : 0);
+	} else
+		timer_blink_bmask = 0xFF;
+}
+
+/**
+ * st7735fb_alarm_overlay() - add alarm to display view
+ *
+ * called in @st7735fb_update_display when alarm is triggered will display alarm message in any display views
+ *
+ */
+static void st7735fb_alarm_overlay(void)
+{
+	if ((clock_and_alarm.is_alarm) && (my_button.view_mode != ALARM)) {
+		alarm_blink_bmask ^= 1 << 1;
+		if  ((alarm_blink_bmask >> 1) & 1)
+			st7735fb_draw_string("ALARM!!!", 0, 50, &font[FONT32], 20, DISP_NOTIF_COLOR);
+	} else
+		alarm_blink_bmask = 0xFF; // clear blinking state
+}
+
+
+/*-----------------------------------------------------------*/
+/*	st7735 driver functions	END			     */
+/*-----------------------------------------------------------*/
+
+/*-----------------------------------------------------------*/
+/*	st7735 display driver  START			     */
+/*-----------------------------------------------------------*/
+
+
+/**
+ *  st7735_write_data() - writes data to spi.
+ *
+ *  returns non-zero on fail
+ */
 static int st7735_write_data(const uint8_t *data, size_t size)
 {
-
 	/* Set data mode */
 	gpio_set_value(st7735fb.dc, 1);
 
@@ -84,7 +295,11 @@ static int st7735_write_data(const uint8_t *data, size_t size)
 	return spi_write(st7735fb.spi, data, size);
 }
 
-
+/**
+ *  st7735_write_cmd() - write display CMD (1 byte).
+ *
+ *  returns non-zero on fail
+ */
 static void st7735_write_cmd(uint8_t data)
 {
 	int ret = 0;
@@ -99,6 +314,9 @@ static void st7735_write_cmd(uint8_t data)
 
 }
 
+/**
+ *  st7735_run_cfg() - run display init configuarion script.
+ */
 static void st7735_run_cfg(void)
 {
 	uint8_t i = 0;
@@ -124,6 +342,9 @@ static void st7735_run_cfg(void)
 	} while (!end_script);
 }
 
+/**
+ *  st7735_reset()
+ */
 static void st7735_reset(void)
 {
 	/* Reset controller */
@@ -133,8 +354,11 @@ static void st7735_reset(void)
 	mdelay(120);
 }
 
+/**
+ * display_update_work() - write data to disp spi workqueue
+ *
+ */
 static void display_update_work(struct work_struct *work)
-
 {
 	int ret = 0;
 	uint8_t *vmem = st7735fb.screen_base;
@@ -149,7 +373,7 @@ static void display_update_work(struct work_struct *work)
 		int x;
 
 		for (x = 0; x < WIDTH; x++)
-		    smem16[x] = (vmem16[x]>>8)|(vmem16[x]<<8);
+			smem16[x] = (vmem16[x]>>8)|(vmem16[x]<<8);
 		smem16 += WIDTH*BPP/16;
 		vmem16 += WIDTH*BPP/16;
 	}
@@ -165,8 +389,27 @@ static void display_update_work(struct work_struct *work)
 
 }
 
+DECLARE_WORK(update_diplay, display_update_work);
 
+/**
+ * external st7735fb_update_display() - schedule @display_update_work()
+ *
+ * update screen view
+ */
+void st7735fb_update_display(void)
+{
 
+	/*add notification overlay*/
+	st7735fb_notifications_overlay();
+	/*add  alarm overlay*/
+	st7735fb_alarm_overlay();
+	schedule_work(&update_diplay);
+}
+
+/**
+ * st7735fb_init_display() - init display from probe
+ *
+ */
 static int st7735fb_init_display(void)
 {
 
@@ -177,507 +420,10 @@ static int st7735fb_init_display(void)
 	st7735fb_update_display();
 	return 0;
 }
-
-
-/*-----------------------------------------------------------*/
-/*	st7735 driver functions	END			     */
-/*-----------------------------------------------------------*/
-
-void st7735fb_blank_display(void)
-{
-	/* clear screen */
-	memset(st7735fb.screen_base,  0, st7735fb.vmem_size);
-	st7735fb_update_display();
-}
-
-void st7735fb_clear_blink_bmask(void)
-{
-	blink_bmask = 0xFF;
-	notif_blink_bmask = 0xFF;
-	alarm_blink_bmask = 0xFF;
-}
-
-void st7735fb_options_display(void)
-{
-
-	switch (my_button.edit_mode) {
-	case 1:
-		blink_bmask ^= 1 << 1;  // option clock 24hrs blinking
-		break;
-	case 2:
-		blink_bmask ^= 1 << 2;  // option alarm blinking
-		break;
-	case 3:
-		blink_bmask ^= 1 << 3;  // option celsius blinking
-		break;
-	default:
-		blink_bmask = 0xFF;
-				}
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	st7735fb_draw_string("Options:", 0, 20, &font[FONT24], 14, DISP_OPTIONS_COLOR);
-
-	/* option is clock 24 hours */
-	st7735fb_draw_string("clock 24 hours", 25, 55, &font[FONT16], 9, DISP_OPTIONS_COLOR);
-	/* option is alarm enabled */
-	st7735fb_draw_string("enable alarm", 25, 75, &font[FONT16], 9, DISP_OPTIONS_COLOR);
-	/* option is mouse enabled */
-	st7735fb_draw_string("temp in celsius", 25, 95, &font[FONT16], 9, DISP_OPTIONS_COLOR);
-	/* draw icon is щption enabled */
-	draw_icon((options.is_ampm ? 2 : 3), 5, 55, ((blink_bmask >> 1) & 1) ? DISP_OPTIONS_COLOR : 0);
-	/* draw icon is option enabled */
-	draw_icon((options.is_alarm_enabled ? 3 : 2), 5, 75, ((blink_bmask >> 2) & 1) ? DISP_OPTIONS_COLOR : 0);
-	/* draw icon is alarm enabled */
-	draw_icon((options.is_temp_celsius ? 3 : 2), 5, 95, ((blink_bmask >> 3) & 1) ? DISP_OPTIONS_COLOR : 0);
-
-	st7735fb_update_display();
-}
-
-void st7735fb_alarm_display(uint8_t alarm_hour, uint8_t alarm_min)
-{
-	static char time[MAX_STRING_SIZE];
-
-
-	switch (my_button.edit_mode) {
-	case 1:
-		blink_bmask ^= 1 << 1;  // min
-		break;
-	case 2:
-		blink_bmask ^= 1 << 2;  // hour
-		break;
-	default:
-		blink_bmask = 0xFF;
-			}
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	st7735fb_draw_string("Alarm:", 0, 20, &font[FONT24], 14, DISP_ALARM_COLOR);
-
-	if (options.is_ampm) {
-		strcpy(time, (alarm_hour > 12 ? "PM":"AM"));
-		st7735fb_draw_string(time, 110, 55, &font[FONT24], 22, DISP_ALARM_COLOR);
-		/* draw tm_hour */
-		sprintf(time, "%2d", (alarm_hour != 12) ? (alarm_hour%12) : 12);
-	} else
-		sprintf(time, "%02d", alarm_hour);
-
-	st7735fb_draw_string(time, 0, 40, &font[FONT48], 22, ((blink_bmask >> 2) & 1) ? DISP_ALARM_COLOR : 0);
-	/* draw tm_min */
-	sprintf(time, "%02d", alarm_min);
-	st7735fb_draw_string(time, 55, 40, &font[FONT48], 22, ((blink_bmask >> 1) & 1) ? DISP_ALARM_COLOR : 0);
-
-	/* draw time separators  */
-	sprintf(time, ":  ");
-	st7735fb_draw_string(time, 38, 38, &font[FONT48], 18, DISP_ALARM_COLOR);
-
-	st7735fb_update_display();
-
-
-}
-
-void st7735fb_clock_display(struct tm *tm)
-{
-	static char time[MAX_STRING_SIZE];
-
-
-	switch (my_button.edit_mode) {
-	case 1:
-		blink_bmask ^= 1 << 1;  // min blinking
-		break;
-	case 2:
-		blink_bmask ^= 1 << 2;  // hour blinking
-		break;
-	case 3:
-		blink_bmask ^= 1 << 3;  // day blinking
-		break;
-	case 4:
-		blink_bmask ^= 1 << 4;  // month blinking
-		break;
-	case 5:
-		blink_bmask ^= 1 << 5;  // year blinking
-		break;
-	default:
-		blink_bmask = 0xFF;
-			}
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	/* draw tm_mday */
-	sprintf(time, "%s", wdays[tm->tm_wday]);
-	st7735fb_draw_string(time, 0, 15, &font[FONT24], 12, DISP_CLOCK_COLOR);
-	/* draw m_day */
-	sprintf(time, "%02d", tm->tm_mday);
-	st7735fb_draw_string(time, 50, 15, &font[FONT24], 12, ((blink_bmask >> 3) & 1) ? DISP_CLOCK_COLOR : 0);
-	/* draw tm_mon */
-	sprintf(time, "%02d", tm->tm_mon+1);
-	st7735fb_draw_string(time, 85, 15, &font[FONT24], 12, ((blink_bmask >> 4) & 1) ? DISP_CLOCK_COLOR : 0);
-	/* draw tm_year */
-	sprintf(time, "%02d", (uint16_t) tm->tm_year % 100);
-	st7735fb_draw_string(time, 120, 15, &font[FONT24], 12, ((blink_bmask >> 5) & 1) ? DISP_CLOCK_COLOR : 0);
-	/* draw date dividers  */
-	sprintf(time, "/  /");
-	st7735fb_draw_string(time, 75, 15, &font[FONT24], 11, DISP_CLOCK_COLOR);
-
-	if (!options.is_ampm) {
-		/* draw tm_hour */
-		sprintf(time, "%02d", tm->tm_hour);
-		st7735fb_draw_string(time, 0, 40, &font[FONT48], 22, ((blink_bmask >> 2) & 1) ? DISP_CLOCK_COLOR : 0);
-		/* draw tm_min */
-		sprintf(time, "%02d", tm->tm_min);
-		st7735fb_draw_string(time, 55, 40, &font[FONT48], 22, ((blink_bmask >> 1) & 1) ? DISP_CLOCK_COLOR : 0);
-		/* draw tm_sec */
-		sprintf(time, "%02d", tm->tm_sec % 100);
-		st7735fb_draw_string(time, 110, 40, &font[FONT48], 22, DISP_CLOCK_COLOR);
-		/* draw time separators  */
-		sprintf(time, ":  :");
-		st7735fb_draw_string(time, 38, 38, &font[FONT48], 18, DISP_CLOCK_COLOR);
-	} else {
-		sprintf(time, "%2d", (tm->tm_hour != 12) ? (tm->tm_hour%12) : 12);
-		st7735fb_draw_string(time, 0, 50, &font[FONT32], 14, ((blink_bmask >> 2) & 1) ? DISP_CLOCK_COLOR : 0);
-		/* draw tm_min */
-		sprintf(time, "%02d", tm->tm_min);
-		st7735fb_draw_string(time, 37, 50, &font[FONT32], 14, ((blink_bmask >> 1) & 1) ? DISP_CLOCK_COLOR : 0);
-		/* draw tm_sec */
-		sprintf(time, "%02d", tm->tm_sec % 100);
-		st7735fb_draw_string(time, 75, 50, &font[FONT32], 14, DISP_CLOCK_COLOR);
-		/* draw time separators  */
-		sprintf(time, ":  :");
-		st7735fb_draw_string(time, 25, 50, &font[FONT32], 13, DISP_CLOCK_COLOR);
-		/* draw am/pm  */
-		strcpy(time, (tm->tm_hour > 12 ? "PM":"AM"));
-		st7735fb_draw_string(time, 110, 60, &font[FONT24], 12, DISP_CLOCK_COLOR);
-			}
-
-	st7735fb_update_display();
-}
-
-void st7735fb_timer_display(void)
-{
-	static char timer[MAX_STRING_SIZE];
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	st7735fb_draw_string("Timer:", 0, 20, &font[FONT16], 10, DISP_TIMER_COLOR);
-
-	sprintf(timer, "%02d:%02d:%03d", (uint32_t)NS_TO_MSEC(our_timer.nsec)/1000/60, (uint32_t)NS_TO_MSEC(our_timer.nsec)/1000%60, (uint32_t)NS_TO_MSEC(our_timer.nsec)%1000);
-
-	st7735fb_draw_string(timer, 10, 50, &font[FONT32], 14, DISP_TIMER_COLOR);
-
-	st7735fb_update_display();
-}
-
-void st7735fb_temp_and_press_display(void)
-{
-	static char value[MAX_STRING_SIZE];
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	st7735fb_draw_string("Temperature:", 0, 20, &font[FONT16], 10, DISP_TEMP_COLOR);
-
-	/* Display temperature in C or in Farenheight  */
-	if (options.is_temp_celsius)
-		sprintf(value, "%d,%d C", temp_and_press.temp/100, temp_and_press.temp%100);
-	else
-		sprintf(value, "%d F", FAHR(temp_and_press.temp/100));
-
-	st7735fb_draw_string(value, 20, 35, &font[FONT24], 12, DISP_TEMP_COLOR);
-	st7735fb_draw_string("Pressure:", 0, 60, &font[FONT16], 10, DISP_PRESS_COLOR);
-	sprintf(value, "%d,%d hPa", temp_and_press.press/256/100, temp_and_press.press/256%100);
-	st7735fb_draw_string(value, 20, 75, &font[FONT24], 12, DISP_PRESS_COLOR);
-
-	st7735fb_update_display();
-}
-
-void st7735fb_pedometer_display(void)
-{
-	static char value[MAX_STRING_SIZE];
-
-	/* clear screen */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	st7735fb_draw_string("Pedometer:", 0, 20, &font[FONT16], 10, DISP_PEDOMETER_COLOR);
-	sprintf(value, "%d", game.steps_count);
-	st7735fb_draw_string(value, 20, 35, &font[FONT24], 12, DISP_PEDOMETER_COLOR);
-
-	st7735fb_update_display();
-}
-
-
-void st7735fb_game_display(void)
-{
-	static char disp_string[MAX_STRING_SIZE];
-	int i;
-
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-
-	if (!game.is_fruit) {
-		get_random_bytes(&game.fruit_x, sizeof(game.fruit_x));
-		get_random_bytes(&game.fruit_y, sizeof(game.fruit_y));
-		game.fruit_x = game.fruit_x%(WIDTH-15)+10;
-		game.fruit_y = game.fruit_x%(HEIGHT-15)+10;
-			if ((game.fruit_x > 20) && (game.fruit_y > 20))
-				game.is_fruit = 1;
-
-	} else
-		draw_icon(8, game.fruit_x-8, game.fruit_y-8, RED_COLOR);
-
-	for (i = 0; i < game.len; i++)
-		draw_icon(9, game.tail_x[i]-8, game.tail_y[i]-8, YELLOW_COLOR);
-
-	for (i = 5; i < game.len; i++)
-		if ((game.tail_x[i] < game.x+3) &&
-				(game.tail_x[i] > game.x-3) &&
-				(game.tail_y[i] > game.y-3) &&
-				(game.tail_y[i] < game.y+3)) {
-			st7735fb_draw_string("GAME OVER", 30, 50, &font[FONT8], 10, RED_COLOR);
-			game.game_over = 1;
-			my_button.state = 0;
-		}
-	for (i = game.len; i > 0; i--) {
-		game.tail_x[i] = game.tail_x[i-1];
-		game.tail_y[i] = game.tail_y[i-1];
-		}
-	game.tail_x[0] = (uint16_t)game.x;
-	game.tail_y[0] = (uint16_t)game.y;
-
-	if (((game.x) < (game.fruit_x+10)) &&
-				(game.x > (game.fruit_x-10)) &&
-				(game.y > (game.fruit_y-10)) &&
-				(game.y < (game.fruit_y+10)) && game.is_fruit)	{
-		game.is_fruit = 0;
-		game.len += 20;
-	}
-
-	if (game.dir_x > 0)
-		draw_icon(7, game.x-8, game.y-8, GREEN_COLOR);
-	if (game.dir_x < 0)
-		draw_icon(5, game.x-8, game.y-8, GREEN_COLOR);
-	if (game.dir_y > 0)
-		draw_icon(4, game.x-8, game.y-8, GREEN_COLOR);
-	if (game.dir_y < 0)
-		draw_icon(6, game.x-8, game.y-8, GREEN_COLOR);
-
-
-	st7735fb_draw_rectangle(0, 0, WIDTH-1, HEIGHT-1, WHITE_COLOR, 0);
-	st7735fb_draw_rectangle(0, 0, WIDTH-1, 15, WHITE_COLOR, 0);
-	sprintf(disp_string, "%06d", game.len-20);
-	st7735fb_draw_string(disp_string, 5, 5, &font[FONT8], 8, WHITE_COLOR);
-	st7735fb_update_display();
-
-}
-
-
-
-
-
-static void draw_char(char letter, uint16_t x, uint16_t y, const struct Bitmap *font, uint16_t color)
-{
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint8_t xc, yc;
-
-	uint16_t char_offset = (letter - ' ') * font->height *
-	 (font->width / 8 + (font->width % 8 ? 1 : 0));
-
-	uint8_t *ptr = &font->table[char_offset];
-
-	for (yc = 0; yc < font->height; yc++) {
-		for (xc = 0; xc < font->width; xc++) {
-			if (*ptr & (0x80 >> (xc % 8)))
-				vmem16[(y+yc)*WIDTH+(x+xc)] = color;
-			if (xc % 8 == 7)
-				ptr++;
-		}
-		if (font->width % 8 != 0)
-			ptr++;
-	}
-
-}
-
-static void draw_icon(uint8_t icon, uint16_t x, uint16_t y, uint16_t color)
-{
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint8_t xc, yc;
-
-	uint16_t icon_offset = icon * icons.height *
-	 (icons.width / 8 + (icons.width % 8 ? 1 : 0));
-
-	uint8_t *ptr = &icons.table[icon_offset];
-
-	for (yc = 0; yc < icons.height; yc++) {
-		for (xc = 0; xc < icons.width; xc++) {
-			if (*ptr & (0x80 >> (xc % 8)))
-				vmem16[(y+yc)*WIDTH+(x+xc)] = color;
-			if (xc % 8 == 7)
-				ptr++;
-		}
-		if (icons.width % 8 != 0)
-			ptr++;
-	}
-}
-
-
-static void st7735fb_draw_string(char *word, uint16_t x, uint16_t y, const struct Bitmap *font, uint8_t x_offset, uint16_t color)
-{
-	uint8_t i = 0;
-
-	while (word[i] != 0) {
-		draw_char(word[i], x, y, font, color);
-		x += x_offset;
-		i++;
-		}
-}
-
-static void st7735fb_draw_rectangle(uint16_t xs, uint16_t ys, uint16_t xe, uint16_t ye, uint16_t color, uint8_t filled)
-{
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint16_t x = 0, y = 0;
-
-	for (x = 0; x < WIDTH; x++)
-		for (y = 0; y < HEIGHT; y++) {
-			if (((x == xs) || (x == xe)) && ((y >= ys) && (y <= ye)) || ((y == ys) || (y == ye)) && ((x >= xs) && (x <= xe)))
-				vmem16[(y)*WIDTH+(x)] = color;
-			if (filled)
-				if (((x >= xs) && (x <= xe)) && ((y >= ys) && (y <= ye)))
-					vmem16[(y)*WIDTH+(x)] = color;
-			}
-}
-
-
-void st7735fb_draw_buff_display(void)
-{
-	int y, x, xs = 0, ys = 0, bmp_x, bmp_y, header;
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-
-	/* Clear display buffer */
-	memset(st7735fb.screen_base, 0, st7735fb.vmem_size);
-
-	bmp_x = fs_buffer.buf[BMP_HEADER_WIDTH];
-	bmp_y = fs_buffer.buf[BMP_HEADER_HEIGHT];
-	header = fs_buffer.buf[BMP_HEADER_IMAGE_START]+1;
-	if ((bmp_x > WIDTH) || (bmp_y > HEIGHT)) {
-		st7735fb_draw_string("Not supported size", 5, 50, &font[FONT16], 8, RED_COLOR);
-		goto err;
-	}
-
-	if (bmp_x < WIDTH)
-		xs = (WIDTH-bmp_x)/2;
-	else
-		bmp_x = WIDTH;
-
-	if (bmp_y < HEIGHT)
-		ys = (HEIGHT-bmp_y)/2;
-	else
-		bmp_y = HEIGHT;
-
-	while (y < bmp_y) {
-		while (x < bmp_x) {
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x10)
-				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 8) |
-													(fs_buffer.buf[header++]);
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x18)
-				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 16) |
-													(fs_buffer.buf[header++] << 8) |
-													(fs_buffer.buf[header++]);
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x20)
-				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 24) |
-													(fs_buffer.buf[header++] << 16) |
-													(fs_buffer.buf[header++] << 8) |
-													(fs_buffer.buf[header++]);
-				x++;
-				}
-			 x = 0;
-			 y++;
-	}
-err:
-	st7735fb_update_display();
-}
-
-int st7735fb_get_buff_display(void)
-{
-	int x, y, header;
-	//uint16_t *buf;
-
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-
-	fs_buffer.buf =  kzalloc(st7735fb.vmem_size, GFP_KERNEL);
-	fs_buffer.buf_len = st7735fb.vmem_size;
-
-	if (fs_buffer.buf == NULL) {
-		pr_err("%s: malloc for buffer failed", __func__);
-		return -ENOMEM;
-	}
-	/* Storing bmp header */
-	sprintf(fs_buffer.buf, "%s", "BM");
-	fs_buffer.buf[BMP_HEADER_WIDTH] = WIDTH;
-	fs_buffer.buf[BMP_HEADER_HEIGHT] = HEIGHT;
-	fs_buffer.buf[BMP_HEADER_IMAGE_START] = 0x42;
-	fs_buffer.buf[BMP_HEADER_BPP] = 0x10;  //16 bit color
-	fs_buffer.buf[BMP_HEADER_SIZE] = 0x28;
-	header = 0x42;
-	for (y = HEIGHT; y > 0; y--)
-		for (x = 0; x <  WIDTH; x++) {
-			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])&0xff);
-			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])>>8);
-		}
-	//memcpy(fs_buffer.buf, buf, fs_buffer.buf_len);
-	return 0;
-}
-
-
-void st7735fb_draw_obj(uint16_t xs, uint16_t ys, uint16_t size)
-{
-	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
-	uint16_t x = 0, y = 0;
-
-	for (x = 0; x < WIDTH; x++)
-		for (y = 0; y < HEIGHT; y++) {
-			if ((x >= xs) && (x <= xs+size) && (y >= ys) && (y <= ys+size))
-				vmem16[(y)*WIDTH+(x)] = BLUE_COLOR;
-			}
-
-}
-
-static void st7735fb_notifications_overlay(void)
-{
-
-	if ((options.is_alarm_enabled) && (my_button.view_mode != GAME))
-		draw_icon(0, 0, 0, DISP_NOTIF_COLOR);
-	if ((our_timer.nsec) && (my_button.view_mode != TIMER) && (my_button.view_mode != GAME)) {
-		notif_blink_bmask ^= 1 << 1;
-		draw_icon(1, 25, 0, ((notif_blink_bmask >> 1) & 1) ? DISP_NOTIF_COLOR : 0);
-	}
-
-}
-
-static void st7735fb_alarm_overlay(void)
-{
-
-	if ((clock_and_alarm.is_alarm) && (my_button.view_mode != ALARM)) {
-		alarm_blink_bmask ^= 1 << 1;
-		if  ((alarm_blink_bmask >> 1) & 1)
-			st7735fb_draw_string("ALARM!!!", 0, 50, &font[FONT32], 20, DISP_NOTIF_COLOR);
-	}
-
-}
-
-static void st7735fb_update_display(void)
-{
-
-	/*add notification overlay*/
-	st7735fb_notifications_overlay();
-	/*add  alarm overlay*/
-	st7735fb_alarm_overlay();
-
-	schedule_work(&update_diplay);
-}
-
+/**
+ * ds3231_probe() - probe and allocate memory for display and spi data
+ *
+ */
 static int st7735fb_probe(struct spi_device *spi)
 {
 	struct device_node *np = spi->dev.of_node;
@@ -776,12 +522,20 @@ struct spi_driver st7735fb_driver = {
 };
 
 
+/**
+ *  st7735fb_init() - init module library from main.
+ *
+ */
 int st7735fb_init(void)
 {
 	pr_err("%s: init\n", DEVICE_NAME);
 	return spi_register_driver(&st7735fb_driver);
 }
 
+/**
+ *  st7735fb_unload() - exit module library from main.
+ *
+ */
 void st7735fb_unload(void)
 {
 	pr_err("%s: exiting\n", DEVICE_NAME);
@@ -794,9 +548,8 @@ void st7735fb_unload(void)
 	pr_err("%s: unloaded\n", DEVICE_NAME);
 
 }
-
-
-
-
+/*-----------------------------------------------------------*/
+/*	st7735 display driver  END			     */
+/*-----------------------------------------------------------*/
 
 
