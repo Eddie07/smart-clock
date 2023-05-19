@@ -490,9 +490,9 @@ static int st7735fb_probe(struct spi_device *spi)
 	return retval;
 
 alloc_fail:
-	if (spi_writebuf != NULL)
+	if (spi_writebuf)
 		kfree(spi_writebuf);
-	if (vmem != NULL)
+	if (vmem)
 		kfree(vmem);
 gpio_fail:
 	gpio_free(st7735fb.dc);
@@ -541,8 +541,10 @@ void st7735fb_unload(void)
 	pr_err("%s: exiting\n", DEVICE_NAME);
 	spi_unregister_driver(&st7735fb_driver);
 	msleep(100);
-	kfree(st7735fb.screen_base);
-	kfree(st7735fb.spi_writebuf);
+	if (st7735fb.screen_base)
+		kfree(st7735fb.screen_base);
+	if (st7735fb.spi_writebuf)
+		kfree(st7735fb.spi_writebuf);
 	gpio_free(st7735fb.dc);
 	gpio_free(st7735fb.rst);
 	pr_err("%s: unloaded\n", DEVICE_NAME);

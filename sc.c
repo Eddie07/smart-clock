@@ -13,6 +13,7 @@
 #include <linux/cdev.h> // cdev_init
 #include <linux/uaccess.h>  //copy_from_user
 #include <linux/export.h>  //export project class name
+#include <linux/slab.h>
 #include "include/project1.h"
 
 
@@ -148,8 +149,6 @@ return -1;
  */
 static void  __exit smart_clock_exit(void)
 {
-	if (fs_buffer.buf != NULL)
-		kfree(fs_buffer.buf);
 	controls_unload();
 	sensors_unload();
 	gpio_button_unload();
@@ -197,14 +196,14 @@ static int device_file_release(struct inode *inode, struct file *file)
 static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t count, loff_t *offset)
 {
 	ssize_t ret;
+	fs_buffer.buf=NULL;
 
 	if (!*offset)
 		if (st7735fb_get_buff_display() < 0)
 			ret = 0;
 
-	if ((*offset >= fs_buffer.buf_len) || (fs_buffer.buf == NULL)) {
+	if ((*offset >= fs_buffer.buf_len)  ) {
 		/* we have finished to read, return 0 */
-		kfree(fs_buffer.buf);
 		ret = 0;
 	} else {
 		/* fill the buffer, return the buffer size */
@@ -212,6 +211,9 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 		*offset += fs_buffer.buf_len;
 		ret = fs_buffer.buf_len;
 	}
+	if (fs_buffer.buf)
+		pr_err ("kfree");
+		kfree(fs_buffer.buf);
 	return ret;
 }
 
