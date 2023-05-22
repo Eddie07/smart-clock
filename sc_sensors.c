@@ -153,13 +153,11 @@ int bmp280_read_temp_and_press(void *pv)
  */
 static int bmp280_probe(struct i2c_client *client, const struct i2c_device_id *id)
 {
-	int ret;
 
 	pr_err("%s: probing\n", BMP280_DEVICE_NAME);
 
 	/*reporting probe to init */
-	ret = i2c_read_byte(client, 0x00);
-	if (ret < 0) {
+	if (i2c_read_byte(client, 0x00) < 0) {
 		pr_err("%s: probe failed\n", BMP280_DEVICE_NAME);
 		return -ENODEV;
 		}
@@ -309,14 +307,12 @@ void ds3231_writeRtcTimeAndAlarm(void)
 static int ds3231_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
-	int ret;
 	struct timespec64 curr_tm_set = {};
 
 	pr_err("%s: probing\n", DC3231_DEVICE_NAME);
 
 	/*reporting probe to init */
-	ret = i2c_read_byte(client, 0x00);
-	if (ret < 0)	{
+	if (i2c_read_byte(client, 0x00) < 0)	{
 		pr_err("%s: probe failed\n", DC3231_DEVICE_NAME);
 		return -ENODEV;
 	}
@@ -419,12 +415,10 @@ return 0;
 static int mpu6050_probe(struct i2c_client *client,
 			 const struct i2c_device_id *id)
 {
-	int ret;
 
 	pr_err("%s: probing\n", MPU6050_DEVICE_NAME);
 	/*reporting probe to init */
-	ret = i2c_read_byte(client, 0x00);
-	if (ret < 0)	{
+	if (i2c_read_byte(client, 0x00) < 0)	{
 		pr_err("%s: probe failed\n", MPU6050_DEVICE_NAME);
 		return -ENODEV;
 	}
