@@ -26,16 +26,22 @@
 
 /* Screen params */
 #define BPP		(16)
+#define BPP_24		(24)
+#define BPP_32		(32)
+
 #define MEM_SIZE	(WIDTH*HEIGHT*BPP/8)
 #define DEVICE_NAME	"st7735fb"
 
 
-/* bmp header offsets */
-#define BMP_HEADER_IMAGE_START	0x0a
-#define BMP_HEADER_SIZE			0x0e
-#define BMP_HEADER_WIDTH		0x12
-#define BMP_HEADER_HEIGHT		0x16
-#define BMP_HEADER_BPP			0x1c
+/* bmp header offsets and values */
+#define BMP_HEADER_IMAGE_START_OFF	0x0a
+#define BMP_HEADER_SIZE_OFF		0x0e
+#define BMP_HEADER_WIDTH_OFF		0x12
+#define BMP_HEADER_HEIGHT_OFF		0x16
+#define BMP_HEADER_BPP_OFF		0x1c
+
+#define BMP_IMAGE_START		0x42
+#define BMP_IMAGE_HEADER_SIZE		0x28
 
 
 uint8_t timer_blink_bmask, alarm_blink_bmask;
@@ -164,9 +170,9 @@ int st7735fb_send_buff_display(void)
 	/* Clear display buffer */
 	st7735fb_blank_vmem();
 	/* Read bmp header and exit if size is bigger than our screen */
-	bmp_size_x = fs_buffer.buf[BMP_HEADER_WIDTH]; //
-	bmp_size_y = fs_buffer.buf[BMP_HEADER_HEIGHT];
-	header = fs_buffer.buf[BMP_HEADER_IMAGE_START]+1;
+	bmp_size_x = fs_buffer.buf[BMP_HEADER_WIDTH_OFF]; //
+	bmp_size_y = fs_buffer.buf[BMP_HEADER_HEIGHT_OFF];
+	header = fs_buffer.buf[BMP_HEADER_IMAGE_START_OFF]+1;
 	if ((bmp_size_x > WIDTH) || (bmp_size_y > HEIGHT)) {
 		st7735fb_draw_string("Not supported size", 5, 50, &font[FONT16], 8, RED_COLOR);
 		return 1;
@@ -180,16 +186,16 @@ int st7735fb_send_buff_display(void)
 	while (y < bmp_size_y) {
 		while (x < bmp_size_x) {
 			/* if bmp is 16 bit color use 2 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x10)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x10)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 8) |
 								(fs_buffer.buf[header++]);
 			/* if bmp is 24 bit color use 3 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x18)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x18)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 16) |
 								(fs_buffer.buf[header++] << 8) |
 								(fs_buffer.buf[header++]);
 			/* if bmp is 32 bit color use 4 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP] == 0x20)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x20)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 24) |
 								(fs_buffer.buf[header++] << 16) |
 								(fs_buffer.buf[header++] << 8) |
@@ -211,30 +217,34 @@ int st7735fb_send_buff_display(void)
  */
 int st7735fb_get_buff_display(void)
 {
-	int x, y, header;
+	int x, y; 
+	uint32_t header;
 
 	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
 
 	fs_buffer.buf =  kzalloc(st7735fb.vmem_size, GFP_KERNEL);
-	fs_buffer.buf_len = st7735fb.vmem_size;
 
 	if (fs_buffer.buf == NULL) {
 		pr_err("%s: malloc for buffer failed", __func__);
 		return -ENOMEM;
 	}
 	/* Storing bmp header */
-	sprintf(fs_buffer.buf, "%s", "BM");
-	fs_buffer.buf[BMP_HEADER_WIDTH] = WIDTH;
-	fs_buffer.buf[BMP_HEADER_HEIGHT] = HEIGHT;
-	fs_buffer.buf[BMP_HEADER_IMAGE_START] = 0x42;
-	fs_buffer.buf[BMP_HEADER_BPP] = 0x10;  //16 bit color
-	fs_buffer.buf[BMP_HEADER_SIZE] = 0x28;
-	header = 0x42;
+	sprintf(fs_buffer.buf, "%s", "BM"); //BM at start
+
+	fs_buffer.buf[BMP_HEADER_WIDTH_OFF] = WIDTH;
+	fs_buffer.buf[BMP_HEADER_HEIGHT_OFF] = HEIGHT;
+	fs_buffer.buf[BMP_HEADER_IMAGE_START_OFF] = BMP_IMAGE_START;
+	fs_buffer.buf[BMP_HEADER_BPP_OFF] = BPP;
+	fs_buffer.buf[BMP_HEADER_SIZE_OFF] = BMP_IMAGE_HEADER_SIZE;
+	header = BMP_IMAGE_START;
 	for (y = HEIGHT; y > 0; y--)
 		for (x = 0; x <  WIDTH; x++) {
 			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])&0xff);
 			fs_buffer.buf[header++] = (uint8_t)((vmem16[(y)*WIDTH+(x)])>>8);
 		}
+	/* Add filesize to header */
+	fs_buffer.buf_len = header-1;
+	memcpy(fs_buffer.buf+2, &fs_buffer.buf_len, sizeof(uint32_t));
 	return 0;
 }
 
@@ -303,7 +313,6 @@ static int st7735_write_data(const uint8_t *data, size_t size)
 static void st7735_write_cmd(uint8_t data)
 {
 	int ret = 0;
-
 
 	/* Set command mode */
 	gpio_set_value(st7735fb.dc, 0);

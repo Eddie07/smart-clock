@@ -200,7 +200,7 @@ extern struct options options;
  */
 struct fs_buffer {
 	char *buf;
-	size_t buf_len;
+	uint32_t buf_len; // use fixed 4 bytes 
 };
 extern struct fs_buffer fs_buffer;
 
