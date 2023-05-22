@@ -327,6 +327,7 @@ static int ds3231_probe(struct i2c_client *client,
 	ds3231_readRtcTimeAndAlarm();
 	curr_tm_set.tv_sec = mktime64(ds3231.year + 1900, ds3231.mon + 1, ds3231.mday,
 			    ds3231.hour, ds3231.min, ds3231.sec);
+	/* Set time of the day from RTC. If fail go on, because it can be while battery if low */		    
 	pr_err("%s: set time of the day from RTC result %d\n", DC3231_DEVICE_NAME, do_settimeofday64(&curr_tm_set));
 
 	ds3231_readOptions();

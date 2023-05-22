@@ -31,8 +31,6 @@
 #define SNAKE_TAIL_MAX	(1000)
 
 
-
-
 /**
  * enum disp_modes  - display view order by switching
  * @CLOCK: clock view

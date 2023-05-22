@@ -213,7 +213,7 @@ static ssize_t device_file_read(struct file *filp, char __user *buffer, size_t c
 	}
 	if (fs_buffer.buf)
 		pr_err ("kfree");
-		kfree(fs_buffer.buf);
+		kfree(fs_buffer.buf);	
 	return ret;
 }
 
@@ -236,9 +236,6 @@ static ssize_t device_file_write(struct file *filp, const char __user *buffer, s
 		pr_err("%s: sysfs write failed\n", __func__);
 		return -EFAULT;
 	}
-
-
-	pr_err("Write bytes to device %d\n", fs_buffer.buf_len);
 
 	/* send buffer to vmem and update the screen, if fail- return 0 */
 	if (st7735fb_send_buff_display())
