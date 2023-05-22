@@ -71,11 +71,10 @@ enum st7735_cmd {
 	ST7735_DELAY
 };
 
-
+/* Display struct */
 static struct st7735fb {
 	struct spi_device *spi;
 	uint8_t *spi_writebuf;
-	size_t vmem_size;
 	char __iomem *screen_base;	/* Virtual address */
 	uint8_t rst;
 	uint8_t dc;

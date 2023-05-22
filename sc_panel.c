@@ -152,7 +152,7 @@ void st7735fb_draw_string(char *text, uint16_t x, uint16_t y, struct Bitmap *fon
  */
 void st7735fb_blank_vmem(void)
 {
-	memset(st7735fb.screen_base,  0, st7735fb.vmem_size);
+	memset(st7735fb.screen_base,  0, MEM_SIZE);
 }
 
 
@@ -170,7 +170,7 @@ int st7735fb_send_buff_display(void)
 	/* Clear display buffer */
 	st7735fb_blank_vmem();
 	/* Read bmp header and exit if size is bigger than our screen */
-	bmp_size_x = fs_buffer.buf[BMP_HEADER_WIDTH_OFF]; //
+	bmp_size_x = fs_buffer.buf[BMP_HEADER_WIDTH_OFF];
 	bmp_size_y = fs_buffer.buf[BMP_HEADER_HEIGHT_OFF];
 	header = fs_buffer.buf[BMP_HEADER_IMAGE_START_OFF]+1;
 	if ((bmp_size_x > WIDTH) || (bmp_size_y > HEIGHT)) {
@@ -186,16 +186,16 @@ int st7735fb_send_buff_display(void)
 	while (y < bmp_size_y) {
 		while (x < bmp_size_x) {
 			/* if bmp is 16 bit color use 2 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x10)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == BPP)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 8) |
 								(fs_buffer.buf[header++]);
 			/* if bmp is 24 bit color use 3 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x18)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == BPP_24)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 16) |
 								(fs_buffer.buf[header++] << 8) |
 								(fs_buffer.buf[header++]);
 			/* if bmp is 32 bit color use 4 bytes color pallete */
-			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == 0x20)
+			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == BPP_32)
 				vmem16[(y+ys)*WIDTH+(x+xs)] = (fs_buffer.buf[header++] << 24) |
 								(fs_buffer.buf[header++] << 16) |
 								(fs_buffer.buf[header++] << 8) |
@@ -222,7 +222,7 @@ int st7735fb_get_buff_display(void)
 
 	uint16_t *vmem16 = (uint16_t *)st7735fb.screen_base;
 
-	fs_buffer.buf =  kzalloc(st7735fb.vmem_size, GFP_KERNEL);
+	fs_buffer.buf =  kzalloc(MEM_SIZE+BMP_IMAGE_START, GFP_KERNEL);
 
 	if (fs_buffer.buf == NULL) {
 		pr_err("%s: malloc for buffer failed", __func__);
@@ -472,24 +472,22 @@ static int st7735fb_probe(struct spi_device *spi)
 		goto gpio_fail;
 	}
 
-	st7735fb.vmem_size = MEM_SIZE;
 
-	vmem = kzalloc(st7735fb.vmem_size, GFP_KERNEL);
+	vmem = kzalloc(MEM_SIZE, GFP_KERNEL);
 	if (!vmem) {
 		retval = -ENOMEM;
 		goto alloc_fail;
 		}
 	st7735fb.screen_base = (uint8_t __force __iomem *)vmem;
-	pr_err("%s: Total vm initialized %d\n", DEVICE_NAME, st7735fb.vmem_size);
+	pr_err("%s: Total vm initialized %d\n", DEVICE_NAME, MEM_SIZE);
 
 	/* Allocate spi write buffer */
-	spi_writebuf = kzalloc(st7735fb.vmem_size, GFP_KERNEL);
+	spi_writebuf = kzalloc(MEM_SIZE, GFP_KERNEL);
 	if (!spi_writebuf) {
 		retval = -ENOMEM;
 		goto alloc_fail;
 		}
 	st7735fb.spi_writebuf = spi_writebuf;
-
 
 	retval = st7735fb_init_display();
 
