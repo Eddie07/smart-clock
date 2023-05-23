@@ -183,7 +183,7 @@ int st7735fb_send_buff_display(void)
 	if (bmp_size_y < HEIGHT)
 		ys = (HEIGHT-bmp_size_y)/2;
 
-	while (y < bmp_size_y) {
+	for (y = bmp_size_y; y > 0; y--) {
 		while (x < bmp_size_x) {
 			/* if bmp is 16 bit color use 2 bytes color pallete */
 			if (fs_buffer.buf[BMP_HEADER_BPP_OFF] == BPP)
@@ -203,7 +203,6 @@ int st7735fb_send_buff_display(void)
 		x++;
 		}
 		x = 0;
-		y++;
 	}
 
 	return 0;
