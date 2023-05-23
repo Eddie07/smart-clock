@@ -53,4 +53,4 @@ help:
 	@echo " 'CROSS_COMPILE'	ARM crosscompiler"
 	@echo "			By Default arm-linux-gnueabihf-"
 
-.PHONY: clean
+.PHONY: clean dtbs
