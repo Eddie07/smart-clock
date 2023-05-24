@@ -43,7 +43,7 @@
 #define SECS_PER_HOUR	(60 * 60)
 #define SECS_PER_DAY	(SECS_PER_HOUR * 24)
 #define ISLP(y) (((y % 400 == 0) && (y % 100 == 0)) || (y % 4 == 0))
-#define GDBM(m, y) ((m == 2) ? (ISLP(y) ? 29 : 28) : ((m % 2) ? 31 : 30))
+#define GDBM(m, y) (((m) == 2) ? (ISLP(y) ? 29 : 28) : (((m) < 8) ? (((m) % 2) ? 31 : 30) : (((m) % 2) ? 30 : 31)))
 #define NS_PER_MSEC (1000000L)
 #define NS_TO_MSEC(nsec) (div_s64(nsec, NS_PER_MSEC))
 #define FAHR(x) (9*x/5+32)
@@ -299,6 +299,7 @@ static void digital_clock_view_callback(struct timer_list *t)
 			break;
 		/*adjust month */
 		case 4:
+			time64_to_tm(clock_and_alarm.clock_sec, 0, &tm_now);
 			clock_and_alarm.clock_sec += GDBM(tm_now.tm_mon+1, tm_now.tm_year)*SECS_PER_DAY;
 			time64_to_tm(clock_and_alarm.clock_sec, 0, &tm_now);
 			if (tm_now.tm_year != tm_stored.tm_year)
@@ -306,10 +307,11 @@ static void digital_clock_view_callback(struct timer_list *t)
 			break;
 		/*adjust year (max 2050) */
 		case 5:
-			clock_and_alarm.clock_sec += (ISLP(tm_stored.tm_year) ? 366*SECS_PER_DAY : 365*SECS_PER_DAY);
 			time64_to_tm(clock_and_alarm.clock_sec, 0, &tm_now);
-			if (tm_now.tm_year % 100 > 50)
-				clock_and_alarm.clock_sec -= ((tm_now.tm_year % 100)-50) * (ISLP(tm_stored.tm_year) ? 366*SECS_PER_DAY : 365*SECS_PER_DAY);
+			clock_and_alarm.clock_sec = mktime64(tm_now.tm_year+1+1900, tm_now.tm_mon + 1, tm_now.tm_mday,
+			    tm_stored.tm_hour, tm_stored.tm_min, tm_stored.tm_sec);
+			if ((tm_now.tm_year+1) % 100 > 50) // rewind year by 50 when reached 2050
+				clock_and_alarm.clock_sec -= (12*366+38*365)*SECS_PER_DAY; //12 leap years and 38 non leap years in 50 years
 			break;
 			};
 
