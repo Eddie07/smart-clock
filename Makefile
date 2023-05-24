@@ -12,7 +12,8 @@ smart_clock-m := \
 # Flags for the compiler to disable some not important warnings
 EXTRA_CFLAGS += \
 	-Wno-unused-result \
-	-Wno-sequence-point
+	-Wno-sequence-point \
+	-Wno-unused-variable
 
 # Default command line values for Makefile
 KDIR ?= ../../kernel_old/linux/
