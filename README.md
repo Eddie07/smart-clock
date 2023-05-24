@@ -1,6 +1,6 @@
 <h1 style="text-align: center;">SMART-CLOCK</h1>
 
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/device.jpg?raw=true" align="center" height="600" width="600" ></a>	
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/device.jpg?raw=true" align="center" height="600" width="600" ></a>	
 
 # Kernel device manual
 
@@ -49,7 +49,7 @@
 
 ### Hardware connection to Raspberry 40 pin extension:
 
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/display_connection.png?raw=true" align="right" height="250" width="350" ></a>
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/display_connection.png?raw=true" align="right" height="250" width="350" ></a>
 
 #### __Connect TFT Module (SPI):__
 
@@ -67,7 +67,7 @@ RST -\> GPIO_24 (pin 18)
 
 GND -\> GROUND (pin 25)
 
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/bmp280_connection.png?raw=true" align="right" height="240" width="350" ></a>
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/bmp280_connection.png?raw=true" align="right" height="240" width="350" ></a>
 
 #### __Connect bmp280 sensor (I2C):__
 
@@ -84,7 +84,7 @@ SDA -\> SDA1 i2c (pin 3)
 &nbsp;
 
 #### __Connect mpu6050 sensor (I2C):__
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/mpu6050_connection.png?raw=true" align="right" height="250" width="350" ></a>
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/mpu6050_connection.png?raw=true" align="right" height="250" width="350" ></a>
 
 VCC-\> 3,3v (pin 1)
 
@@ -99,7 +99,7 @@ AD0 -\> 3,3v (pin 1)
 &nbsp;
 
 #### __Connect rtc3231 (w/o eeprom) (I2C):__
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/rtc3231_connection.png?raw=true" align="right" height="250" width="350" ></a>
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/rtc3231_connection.png?raw=true" align="right" height="250" width="350" ></a>
 
 \+   -\> 3,3v (pin 1)
 
@@ -114,7 +114,7 @@ D -\> SDA1 i2c (pin 3)
 &nbsp;
 
 #### __Connect hardware button (2 pin):__
-<a href="url"><img src="https://github.com/Eddie07/media/blob/main/blob/media/button_connection.png?raw=true" align="right" height="250" width="350" ></a>
+<a href="url"><img src="https://github.com/Eddie07/smart-clock/blob/main/blob/media/button_connection.png?raw=true" align="right" height="250" width="350" ></a>
 
 Pin1 -\> 3,3v (pin 1)
 
@@ -270,7 +270,7 @@ entertainment part. Functions:
 
 #### 2.1.1. Time
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/clock_24.png?raw=true)    ![](https://github.com/Eddie07/media/blob/main/blob/media/clock_am.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/clock_24.png?raw=true)    ![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/clock_am.png?raw=true)
 
 Hold the button longer than 1 sec to enter first view mode.
 
@@ -298,7 +298,7 @@ Use long click to switch mode to next mode: **Timer**
 
 #### 2.1.2. Timer
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/timer.png?raw=true) 
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/timer.png?raw=true) 
 
 Timer can be **started and stopped** by short pressing of the button.
 
@@ -313,7 +313,7 @@ Switch to the next view **Alarm** press long press button.
 
 #### 2.1.3. Alarm
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/alarm.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/alarm.png?raw=true)
 
 The alarm can be turned on and off in **Options** view.
 
@@ -335,7 +335,7 @@ stored in rtc.*
 
 #### 2.1.4. Temperature and air pressure.
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/temp_press.png?raw=true) ![](https://github.com/Eddie07/media/blob/main/blob/media/temp_f.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/temp_press.png?raw=true) ![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/temp_f.png?raw=true)
 
 Temperature can be shown in C or F. Check **Options** for the option.
 
@@ -346,7 +346,7 @@ Switch the next view **Pedometer** press long-press button.
 
 #### 2.1.5. Pedometer.
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/pedometer.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/pedometer.png?raw=true)
 
 Pedometer or Step meter shows steps (or vertical shakes) from the device
 start.
@@ -357,7 +357,7 @@ Switch the next view **Game** press long-press button.
 
 #### 2.1.6. Game
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/game.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/game.png?raw=true)
 
 Besides of pedometer the mpu6050 is also used for the control of the
 game "SNAKE".
@@ -374,7 +374,7 @@ Switch the next view **Options** press long-press button.
 
 #### 2.1.7. Options
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/options.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/options.png?raw=true)
 
 *Adjusting the options:*
 
@@ -414,7 +414,7 @@ Otherwise, you will receive the error message.*
 
 #### 2.1.10. Notifications bar.
 
-![](https://github.com/Eddie07/media/blob/main/blob/media/notif.png?raw=true)
+![](https://github.com/Eddie07/smart-clock/blob/main/blob/media/notif.png?raw=true)
 
 When alarm is enabled in options -- the icon "Alarm" will be shown is
 notification bar on screen.
